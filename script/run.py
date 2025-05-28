@@ -9,13 +9,16 @@ from pathlib import Path
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
-def read_fvecs(file_name: str) -> np.ndarray:
+def read_fvecs(file_name: str, show_shape : bool = False) -> np.ndarray:
     print("begin to read fvecs: ", file_name)        
     with open(file_name, 'rb') as f:
         data = np.fromfile(f, dtype = np.float32)
         
     dim = struct.unpack('i', data[0])[0]            
     data = data.reshape(-1, dim + 1)
+    
+    if show_shape:
+        print(f"data.shape: {data.shape}, dim: {dim}")
 
     # 仅使用 emb 部分
     return data[:, 1:]
@@ -114,14 +117,16 @@ def pca_dim_analyze(file_name, data_num, target_var =0.9):
     print(f"target_var: {target_var}, target_k: {target_k}")
     
 def huggingface_dataset_download() -> None:
-    save_name = "cohere"
-    data_url = f"Cohere/wikipedia-22-12-zh-embeddings"
-    save_path = '../data/' + save_name + ".fvecs"
+    save_name = "bigcode"
+    data_url = f"bigcode/stack-exchange-embeddings-20230914"
+    save_path = '../data/' + save_name + "/" + save_name + ".fvecs"
+    pathlib.Path(os.path.dirname(save_path)).mkdir(parents=True, exist_ok=True)
 
     # 字段映射，根据需要修改
+    # 内部字段：外部字段
     field_map = {
-        "id": "id", 
-        "emb": "emb"
+        "id": "qid", 
+        "emb": "embeddings"
     }
     
     dataset = load_dataset(data_url, split="train", streaming=True)
@@ -146,11 +151,24 @@ def huggingface_dataset_download() -> None:
                 cur_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
                 print(f"{cur_time}: Processed {doc_cnt} documents")
         print(f"download done")
+       
+def transfer_npy_to_fvecs() -> None:
+    src_path = "/home/chencheng12/project/ann_data/data/dup128d_80w/dup128d_785490.npy"
+    dst_path = "/home/chencheng12/project/ann_data/data/dup128d_80w/dup128d_80w.fvecs"
+    
+    with open(src_path, "rb") as f:
+        data = np.load(f)
+        print(f"read from {src_path}, data.shape: {data.shape}")
+        
+        write_fvecs(dst_path, data)
+    print(f"transfer done, write to {dst_path}")
+           
           
 def split_dataset(seed = 42) -> None:
     # 将数据分割成 base / query 两个部分
     root_path = "../data/"
-    data_name = "sift_single"
+    data_name = "bigcode"
+    n_query = 20000
 
     data_path = os.path.join(root_path, data_name, data_name + ".fvecs")
     base_path = os.path.join(root_path, data_name, data_name + "_base.fvecs")
@@ -158,18 +176,15 @@ def split_dataset(seed = 42) -> None:
     
     data = read_fvecs(data_path) 
     print("data.shape:", data.shape)
-    n_query = 1
-    
+
     np.random.seed(seed)
-    indices = np.random.permutation(data.shape[0])
+    np.random.shuffle(data)
     
-    query_index = indices[:n_query]
-    base_index = indices[n_query:]
-    
-    query_index = data[query_index]
-    base_index = data[base_index]
-    print("base_index.shape:", base_index.shape)
+    query_index = data[:n_query, :]
     print("query_index.shape:", query_index.shape)
+    
+    base_index = data[n_query:, :]
+    print("base_index.shape:", base_index.shape)
     
     write_fvecs(base_path, base_index)
     write_fvecs(query_path, query_index)
@@ -213,23 +228,30 @@ def compute_batch_id(id, base, query, topk):
     print(f"compute_batch_id {id} done, topk_indices shape: {topk_indices.shape}")
     return topk_indices
 
-def compute_groundtruth_batch_with_parallel(base_data, query_data, topk, batch_size = 100, n_jobs = 4):
+def compute_groundtruth_batch_with_parallel(base_data, query_data, topk, batch_size = 100, n_jobs = 2):
     n_query = query_data.shape[0]
     batches = [(i, query_data[i : i + batch_size]) for i in range(0, n_query, batch_size)]
     print("batches len:", len(batches))
     
-    results = Parallel(n_jobs=n_jobs, backend = 'loky') (
-        delayed(compute_batch_id)(i, base_data, q_batch, topk) for i, q_batch in batches
-    )
+    if n_jobs > 1:
+        results = Parallel(n_jobs=n_jobs, backend = 'loky') (
+            delayed(compute_batch_id)(i, base_data, q_batch, topk) for i, q_batch in batches
+        )
+    else :
+        for i in range(len(batches)):
+            results = []
+            q_batch = batches[i][1]
+            topk_indices = compute_batch_id(i, base_data, q_batch, topk)
+            results.append(topk_indices)
 
     return np.vstack(results)
       
 def generate_groundtruth() -> None:
     # 生成 groundtruth 文件
     root_path = "../data/"
-    data_name = "sift_single"
+    data_name = "bigcode"
     # 计算 query 的 topk groundtruth
-    topk = 1
+    topk = 100
     
     use_pca = False
     pca_dim = 128
@@ -247,7 +269,7 @@ def generate_groundtruth() -> None:
         groundtruth_path = os.path.join(root_path, data_name, data_name + "_groundtruth_pca.ivecs")
         print("pca done")
     
-    groundtruth = compute_groundtruth_batch_with_parallel(base_data, query_data, topk, batch_size = 100, n_jobs = 5)
+    groundtruth = compute_groundtruth_batch_with_parallel(base_data, query_data, topk, batch_size = 100, n_jobs = 2)
     write_ivecs(groundtruth_path, groundtruth)
     
     print("groundtruth done")
@@ -339,7 +361,7 @@ def read_pq_codebook(file_path: str, dim: int, n_subvector: int, n_class: int, e
         
     return q_min, q_max, codebook, pca_data_mean, pca_principal
 
-def encode_pq(data: np.ndarray, codebook: np.ndarray, n_subvector: int, quantize_type: np.dtype, q_min: float, q_max: float, is_query: bool = True, pca_mean: np.ndarray, pca_principal: np.ndarray) -> np.ndarray:    
+def encode_pq(data: np.ndarray, codebook: np.ndarray, n_subvector: int, quantize_type: np.dtype, q_min: float, q_max: float, is_query: bool = True, pca_mean: np.ndarray = None, pca_principal: np.ndarray = None) -> np.ndarray:    
     # PQ 编码
     n_data, dim = data.shape
     n_class = codebook.shape[0]
@@ -348,7 +370,7 @@ def encode_pq(data: np.ndarray, codebook: np.ndarray, n_subvector: int, quantize
     pq_code = np.zeros((n_data, n_subvector, n_class + 1), dtype = quantize_type)
     for k in range(n_data):
         # 计算 PCA
-        if pca_mean not None:
+        if pca_mean is not None:
             data[k] = data[k] - pca_mean
             data[k] = np.dot(data[k], pca_principal)
         
@@ -479,29 +501,43 @@ def compute_ip_dis():
     ip_dis = 1 - ip_dis
     print(f"ip_dis: {ip_dis}")
     pass
+
+def random_emb(dim: int):
+    np.random.seed(42)
+    n_data = 1
+    data = np.random.rand(n_data, dim).astype(np.float32)
+    print(f"random_emb: {data.shape}")
+    
+    data = data[0]
+    emb_str = ""
+    for i in range(dim):
+        emb_str += f"{data[i]:.6f}, "
+    
+    print(f"random_emb: \n{emb_str}")
+    pass
     
                
 if __name__ == "__main__":
     # huggingface_dataset_download()
-    # split_dataset()
-    # generate_groundtruth()
-    # read_vecs_at("/home/chencheng12/project/ann_data/data/cohere_zh/cohere_zh_groundtruth.ivecs", 0)
-    # read_vecs_at("/home/chencheng12/project/ann_data/data/cohere_zh/cohere_zh_query.fvecs", 0)
+    # transfer_npy_to_fvecs()
     
-    # read_vecs_at("/home/chencheng12/project/ann_data/data/cohere_zh/cohere_zh_groundtruth_ip.ivecs", 0)
-    # read_vecs_at("/home/chencheng12/project/ann_data/data/sift/sift_groundtruth.ivecs", 0)
-    # read_vecs_at("/home/chencheng12/project/ann_data/data/sift/sift_query.fvecs", 0)
+    # split_dataset()
+    generate_groundtruth()
+    
+    # read_fvecs("/home/chencheng12/project/ann_data/data/bigcode/bigcode.fvecs", True)
     
     # read_vecs_at("/home/chencheng12/project/ann_data/data/sift_single/sift_single_query.fvecs", 0)
-    # read_vecs_at("/home/chencheng12/project/ann_data/data/sift_single/sift_single_base.fvecs", 2)
+    # read_vecs_at("/home/chencheng12/project/ann_data/data/bigcode/bigcode.fvecs", 2)
 
     # compute_distance()
     
-    # pca_dim_analyze("/home/chencheng12/project/ann_data/data/cohere_zh/cohere_zh_base.fvecs", 10000, 0.90)
+    # pca_dim_analyze("/home/chencheng12/project/ann_data/data/dup128d_80w/dup128d_80w_base.fvecs", 10000, 0.90)
     # compare_recall()
     
     # read_pq_codebook("/home/chencheng12/project/ann_data/data/codebooks/sift/codebooks_flash_INT8_512_32_16_256_64_0_1_0.txt", 128, 16, 256)
-    compute_pq_dis()
+    # compute_pq_dis()
     
     # compute_ip_dis()
+    
+    # random_emb(64)
     pass
