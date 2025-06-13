@@ -9,7 +9,7 @@ from pathlib import Path
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
-def read_fvecs(file_name: str, show_shape : bool = False) -> np.ndarray:
+def read_fvecs(file_name : str, show_shape : bool = False) -> np.ndarray:
     print("begin to read fvecs: ", file_name)        
     with open(file_name, 'rb') as f:
         data = np.fromfile(f, dtype = np.float32)
@@ -64,10 +64,10 @@ def read_vecs_at(file_path: str, index: int) -> None:
         value_type = np.int32
     
     with open(file_path , "rb") as f:
-        dim_bytes = f.read(4)
-        if not dim_bytes:
+        dim_expytes = f.read(4)
+        if not dim_expytes:
             raise ValueError("文件为空")
-        d = struct.unpack('i', dim_bytes)[0]
+        d = struct.unpack('i', dim_expytes)[0]
         
         vec_size = 4 * (d + 1)
         offset = index * vec_size
@@ -87,7 +87,7 @@ def read_vecs_at(file_path: str, index: int) -> None:
         
     return vec
         
-def pca_dim_analyze(file_name, data_num, target_var =0.9):
+def pca_dim_expasenalyze(file_name, data_num, target_var =0.9):
     # PCA 降维
     data = read_fvecs(file_name)
     
@@ -211,8 +211,8 @@ def compute_distance():
     base = base_data[base_index]
     
     # 计算距离
-    ip_score = np.dot(query, base.T)
-    print("ip_score: ", ip_score)
+    # ip_score = np.dot(query, base.T)
+    # print("ip_score: ", ip_score)
     
     l2_squared  = np.sum(query ** 2, axis=1, keepdims=True) + np.sum(base ** 2, axis=1) - 2 * np.dot(query, base.T)
     print("l2_score: ", l2_squared)
@@ -228,7 +228,7 @@ def compute_batch_id(id, base, query, topk):
     print(f"compute_batch_id {id} done, topk_indices shape: {topk_indices.shape}")
     return topk_indices
 
-def compute_groundtruth_batch_with_parallel(base_data, query_data, topk, batch_size = 100, n_jobs = 2):
+def compute_groundtruth_expatch_with_parallel(base_data, query_data, topk, batch_size = 100, n_jobs = 2):
     n_query = query_data.shape[0]
     batches = [(i, query_data[i : i + batch_size]) for i in range(0, n_query, batch_size)]
     print("batches len:", len(batches))
@@ -238,23 +238,76 @@ def compute_groundtruth_batch_with_parallel(base_data, query_data, topk, batch_s
             delayed(compute_batch_id)(i, base_data, q_batch, topk) for i, q_batch in batches
         )
     else :
+        results = []
         for i in range(len(batches)):
-            results = []
             q_batch = batches[i][1]
             topk_indices = compute_batch_id(i, base_data, q_batch, topk)
             results.append(topk_indices)
 
     return np.vstack(results)
+
+
+def compute_groundtruth_safe(base, query, topk=100, query_batch_size=100, base_batch_size=10000):
+    nq = query.shape[0]
+    nb = base.shape[0]
+    dim = base.shape[1]
+    
+    final_topk_indices = np.zeros((nq, topk), dtype=np.int32)
+    final_topk_dists = np.full((nq, topk), np.inf, dtype=np.float32)
+
+    for q_start in range(0, nq, query_batch_size):
+        print(f"Processing query batch {q_start // query_batch_size + 1}/{(nq + query_batch_size - 1) // query_batch_size}")
+        q_end = min(q_start + query_batch_size, nq)
+        q_batch = query[q_start:q_end]  # (Bq, dim)
+
+        # 当前 batch 的 topk 初始化
+        batch_dists = np.full((q_end - q_start, topk), np.inf, dtype=np.float32)
+        batch_indices = np.full((q_end - q_start, topk), -1, dtype=np.int32)
+
+        for b_start in range(0, nb, base_batch_size):
+            b_end = min(b_start + base_batch_size, nb)
+            b_batch = base[b_start:b_end]  # (Bb, dim)
+
+            # 距离计算 (L2 squared)
+            dists = (
+                np.sum(q_batch ** 2, axis=1, keepdims=True) +
+                np.sum(b_batch ** 2, axis=1) -
+                2 * np.dot(q_batch, b_batch.T)
+            )  # shape: (Bq, Bb)
+
+            # 合并现有结果
+            combined_dists = np.concatenate([batch_dists, dists], axis=1)
+            combined_indices = np.concatenate([
+                batch_indices,
+                np.arange(b_start, b_end).reshape(1, -1).repeat(q_end - q_start, axis=0)
+            ], axis=1)
+
+            # 选出 topk（不需要完全排序）
+            topk_idx = np.argpartition(combined_dists, topk, axis=1)[:, :topk]
+            row_idx = np.arange(q_end - q_start)[:, None]
+
+            batch_dists = np.take_along_axis(combined_dists, topk_idx, axis=1)
+            batch_indices = np.take_along_axis(combined_indices, topk_idx, axis=1)
+
+            # 再次排序（按距离升序，稳定结果）
+            order = np.argsort(batch_dists, axis=1)
+            batch_dists = np.take_along_axis(batch_dists, order, axis=1)
+            batch_indices = np.take_along_axis(batch_indices, order, axis=1)
+
+        # final_topk_dists[q_start:q_end] = batch_dists
+        final_topk_indices[q_start:q_end] = batch_indices
+
+    return final_topk_indices
       
 def generate_groundtruth() -> None:
     # 生成 groundtruth 文件
     root_path = "../data/"
-    data_name = "bigcode"
+    data_name = "sift1m"
     # 计算 query 的 topk groundtruth
     topk = 100
     
-    use_pca = False
-    pca_dim = 128
+    use_pca = True
+    pca_dim = 96
     
     base_path = os.path.join(root_path, data_name, data_name + "_base.fvecs")
     query_path = os.path.join(root_path, data_name, data_name + "_query.fvecs")
@@ -266,41 +319,51 @@ def generate_groundtruth() -> None:
         pca = PCA(n_components = pca_dim)
         base_data = pca.fit_transform(base_data)
         query_data = pca.transform(query_data)
-        groundtruth_path = os.path.join(root_path, data_name, data_name + "_groundtruth_pca.ivecs")
+        groundtruth_path = os.path.join(root_path, data_name, data_name + "_groundtruth_pca_" + str(pca_dim) + ".ivecs")
         print("pca done")
     
-    groundtruth = compute_groundtruth_batch_with_parallel(base_data, query_data, topk, batch_size = 100, n_jobs = 2)
+    # groundtruth = compute_groundtruth_expatch_with_parallel(base_data, query_data, topk, batch_size = 100, n_jobs = 2)
+    
+    groundtruth = compute_groundtruth_safe(base_data, query_data, topk, query_batch_size=100, base_batch_size=1000000)
     write_ivecs(groundtruth_path, groundtruth)
     
     print("groundtruth done")
     
 def compare_recall() -> None:
-    base_groundtruth_path = "/home/chencheng12/project/ann_data/data/sift/sift_groundtruth.ivecs.org"
-    compare_groundtruth_path = "/home/chencheng12/project/ann_data/data/sift/sift_groundtruth.ivecs"
+    base_groundtruth_path = "/home/chencheng12/project/ann_data/data/sift1m/sift1m_groundtruth.ivecs"
+    compare_groundtruth_path = "/home/chencheng12/project/ann_data/data/sift1m/sift1m_groundtruth_pca_96.ivecs"
+    topk = 1
     
-    groundtruth_a = read_ivecs(base_groundtruth_path)
-    dim_a = groundtruth_a.shape[1]
+    groundtruth_expase = read_ivecs(base_groundtruth_path)
+    dim_expase = groundtruth_expase.shape[1]
     
-    groundtruth_b = read_ivecs(compare_groundtruth_path)
-    dim_b = groundtruth_b.shape[1]
+    groundtruth_exp = read_ivecs(compare_groundtruth_path)
+    dim_exp = groundtruth_exp.shape[1]
     
-    query_num = groundtruth_a.shape[0]
+    query_num = groundtruth_expase.shape[0]
     
-    compare_dim = min(dim_a, dim_b)
-    groundtruth_a = groundtruth_a[:, :compare_dim]
-    groundtruth_b = groundtruth_b[:, :compare_dim]
+    # compare_dim = min(dim_expase, dim_exp)
+    compare_dim = topk
+    
+    groundtruth_expase = groundtruth_expase[:, :compare_dim]
+    groundtruth_exp = groundtruth_exp[:, :compare_dim]
     
     # 计算 recall
     recalls = []
+    
+    total_dim_num = query_num * compare_dim
+    correct_dim_num = 0
     for i in range(query_num):
-        a = set(groundtruth_a[i])
-        b = set(groundtruth_b[i])
+        a = set(groundtruth_expase[i])
+        b = set(groundtruth_exp[i])
         
         # 计算 recall
-        recall = len(a.intersection(b)) / len(a)
-        recalls.append(recall)
+        correct_dim_num += len(a.intersection(b))
+        # recall = len(a.intersection(b)) / len(a)
+        # recalls.append(recall)
         
-    recall_score =  np.mean(recalls)
+    # recall_score =  np.mean(recalls)
+    recall_score = correct_dim_num / total_dim_num
     print(f"recall score: {recall_score}")
     
 def compute_kmeans(file_path: str, n_subvector: int, n_class: int) -> None:
@@ -522,22 +585,22 @@ if __name__ == "__main__":
     # transfer_npy_to_fvecs()
     
     # split_dataset()
-    generate_groundtruth()
+    # generate_groundtruth()
     
     # read_fvecs("/home/chencheng12/project/ann_data/data/bigcode/bigcode.fvecs", True)
     
     # read_vecs_at("/home/chencheng12/project/ann_data/data/sift_single/sift_single_query.fvecs", 0)
-    # read_vecs_at("/home/chencheng12/project/ann_data/data/bigcode/bigcode.fvecs", 2)
+    # read_vecs_at("/home/chencheng12/project/ann_data/data/sift1m/sift1m_groundtruth.ivecs", 0)
 
     # compute_distance()
     
-    # pca_dim_analyze("/home/chencheng12/project/ann_data/data/dup128d_80w/dup128d_80w_base.fvecs", 10000, 0.90)
-    # compare_recall()
+    # pca_dim_expasenalyze("/home/chencheng12/project/ann_data/data/bigcode/bigcode_base.fvecs", 10000, 0.90)
+    compare_recall()
     
     # read_pq_codebook("/home/chencheng12/project/ann_data/data/codebooks/sift/codebooks_flash_INT8_512_32_16_256_64_0_1_0.txt", 128, 16, 256)
     # compute_pq_dis()
     
     # compute_ip_dis()
     
-    # random_emb(64)
+    # random_emb(128)
     pass
