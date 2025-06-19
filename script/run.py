@@ -8,6 +8,12 @@ from joblib import Parallel, delayed
 from pathlib import Path
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
+import gc
+
+
+def do_gc():
+  gc.collect()
+  pass  
 
 def read_fvecs(file_name : str, show_shape : bool = False) -> np.ndarray:
     print("begin to read fvecs: ", file_name)        
@@ -117,16 +123,21 @@ def pca_dim_expasenalyze(file_name, data_num, target_var =0.9):
     print(f"target_var: {target_var}, target_k: {target_k}")
     
 def huggingface_dataset_download() -> None:
-    save_name = "bigcode"
-    data_url = f"bigcode/stack-exchange-embeddings-20230914"
+    save_name = "cohere_zh"
+    #data_url = f"bigcode/stack-exchange-embeddings-20230914"
+    #data_url = f"Cohere/wikipedia-22-12-zh-embeddings"
+    #data_url = f"Cohere/wikipedia-22-12-zh-embeddings"
+    data_url = f"nielsr/datacomp-small-with-embeddings-and-cluster-labels"
+    
+
     save_path = '../data/' + save_name + "/" + save_name + ".fvecs"
     pathlib.Path(os.path.dirname(save_path)).mkdir(parents=True, exist_ok=True)
 
     # 字段映射，根据需要修改
     # 内部字段：外部字段
     field_map = {
-        "id": "qid", 
-        "emb": "embeddings"
+        "id": "id", 
+        "emb": "clip_l14_embedding"
     }
     
     dataset = load_dataset(data_url, split="train", streaming=True)
@@ -167,7 +178,7 @@ def transfer_npy_to_fvecs() -> None:
 def split_dataset(seed = 42) -> None:
     # 将数据分割成 base / query 两个部分
     root_path = "../data/"
-    data_name = "bigcode"
+    data_name = "cohere_zh"
     n_query = 20000
 
     data_path = os.path.join(root_path, data_name, data_name + ".fvecs")
@@ -217,11 +228,16 @@ def compute_distance():
     l2_squared  = np.sum(query ** 2, axis=1, keepdims=True) + np.sum(base ** 2, axis=1) - 2 * np.dot(query, base.T)
     print("l2_score: ", l2_squared)
     
-def compute_batch_id(id, base, query, topk):
+def compute_batch_id(id, base, query, topk, base_sqr = None):
     # 计算距离
 
     # score = np.dot(query, base.T)
-    score = np.sum(query ** 2, axis=1, keepdims=True) + np.sum(base ** 2, axis=1) - 2 * np.dot(query, base.T)
+
+    print(f"begin to compute {id}")
+    if base_sqr is not None:
+      score = np.sum(query ** 2, axis=1, keepdims=True) + base_sqr - 2 * np.dot(query, base.T)
+    else:
+      score = np.sum(query ** 2, axis=1, keepdims=True) + np.sum(base ** 2, axis=1) - 2 * np.dot(query, base.T)
     
     # 获取 topk 的索引
     topk_indices = np.argsort(score, axis=1)[:, :topk]
@@ -239,13 +255,13 @@ def compute_groundtruth_expatch_with_parallel(base_data, query_data, topk, batch
         )
     else :
         results = []
+        base_sqr = np.sum(base_data ** 2, axis = 1)
         for i in range(len(batches)):
             q_batch = batches[i][1]
-            topk_indices = compute_batch_id(i, base_data, q_batch, topk)
+            topk_indices = compute_batch_id(i, base_data, q_batch, topk, base_sqr)
             results.append(topk_indices)
 
     return np.vstack(results)
-
 
 def compute_groundtruth_safe(base, query, topk=100, query_batch_size=100, base_batch_size=10000):
     nq = query.shape[0]
@@ -256,8 +272,10 @@ def compute_groundtruth_safe(base, query, topk=100, query_batch_size=100, base_b
     final_topk_dists = np.full((nq, topk), np.inf, dtype=np.float32)
 
     for q_start in range(0, nq, query_batch_size):
-        print(f"Processing query batch {q_start // query_batch_size + 1}/{(nq + query_batch_size - 1) // query_batch_size}")
         q_end = min(q_start + query_batch_size, nq)
+
+        cur_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+        print(f"{cur_time} cur query: {q_start}, query_end: {nq}")
         q_batch = query[q_start:q_end]  # (Bq, dim)
 
         # 当前 batch 的 topk 初始化
@@ -297,7 +315,7 @@ def compute_groundtruth_safe(base, query, topk=100, query_batch_size=100, base_b
         # final_topk_dists[q_start:q_end] = batch_dists
         final_topk_indices[q_start:q_end] = batch_indices
 
-    return final_topk_indices
+    return final_topk_indices 
       
 def generate_groundtruth() -> None:
     # 生成 groundtruth 文件
@@ -322,9 +340,8 @@ def generate_groundtruth() -> None:
         groundtruth_path = os.path.join(root_path, data_name, data_name + "_groundtruth_pca_" + str(pca_dim) + ".ivecs")
         print("pca done")
     
-    # groundtruth = compute_groundtruth_expatch_with_parallel(base_data, query_data, topk, batch_size = 100, n_jobs = 2)
-    
-    groundtruth = compute_groundtruth_safe(base_data, query_data, topk, query_batch_size=100, base_batch_size=1000000)
+    #groundtruth = compute_groundtruth_batch_with_parallel(base_data, query_data, topk, batch_size = 500, n_jobs = 1)
+    groundtruth = compute_groundtruth_safe(base_data, query_data, topk, query_batch_size=1000, base_batch_size = 1000000)
     write_ivecs(groundtruth_path, groundtruth)
     
     print("groundtruth done")
@@ -581,21 +598,23 @@ def random_emb(dim: int):
     
                
 if __name__ == "__main__":
-    # huggingface_dataset_download()
+  try:
+
+    #huggingface_dataset_download()
     # transfer_npy_to_fvecs()
     
-    # split_dataset()
-    # generate_groundtruth()
+    #split_dataset()
+    #generate_groundtruth()
     
-    # read_fvecs("/home/chencheng12/project/ann_data/data/bigcode/bigcode.fvecs", True)
+    #read_fvecs("/mnt/test/cc/project/ANN-Data/data/bigcode/bigcode_base.fvecs", True)
     
     # read_vecs_at("/home/chencheng12/project/ann_data/data/sift_single/sift_single_query.fvecs", 0)
-    # read_vecs_at("/home/chencheng12/project/ann_data/data/sift1m/sift1m_groundtruth.ivecs", 0)
+    #read_vecs_at("/mnt/test/cc/project/ANN-Data/data/sift1m/sift1m_base.fvecs", 2)
 
     # compute_distance()
     
-    # pca_dim_expasenalyze("/home/chencheng12/project/ann_data/data/bigcode/bigcode_base.fvecs", 10000, 0.90)
-    compare_recall()
+    #pca_dim_analyze("/mnt/test/cc/project/ANN-Data/data/bigcode/bigcode_base.fvecs", 200000, 0.90)
+    # compare_recall()
     
     # read_pq_codebook("/home/chencheng12/project/ann_data/data/codebooks/sift/codebooks_flash_INT8_512_32_16_256_64_0_1_0.txt", 128, 16, 256)
     # compute_pq_dis()
@@ -603,4 +622,8 @@ if __name__ == "__main__":
     # compute_ip_dis()
     
     # random_emb(128)
+  finally:
+    from joblib.externals.loky import get_reusable_executor
+    get_reusable_executor().shutdown(wait=True)
+
     pass
