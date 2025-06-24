@@ -9,13 +9,22 @@ from pathlib import Path
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 import gc
-
+import pandas as pd
+import ast
+import pprint
+import json
 
 def do_gc():
   gc.collect()
   pass  
 
-def read_fvecs(file_name : str, show_shape : bool = False) -> np.ndarray:
+def show_vec(data):
+  output = ''
+  for i in range(len(data)):
+    output += str(data[i]) + ', '
+  print(output + "\n")
+
+def read_fvecs(file_name: str, show_shape : bool = False) -> np.ndarray:
     print("begin to read fvecs: ", file_name)        
     with open(file_name, 'rb') as f:
         data = np.fromfile(f, dtype = np.float32)
@@ -52,7 +61,6 @@ def write_ivecs(file_name: str, data: np.ndarray) -> None:
     print("begin to write ivecs")
     data = np.asarray(data, dtype = np.int32)
     dim = data.shape[1]
-    print("cc debug: dim:", dim)
     with open(file_name, 'wb') as f:
         for row in data:
             f.write(np.array([dim], dtype = np.int32).tobytes())
@@ -88,8 +96,8 @@ def read_vecs_at(file_path: str, index: int) -> None:
         print(f"dim: {d} \nvec: {vec}")
         
         # get l2 distance
-        # l2_squared = np.sum(vec ** 2)
-        # print(f"l2_squared: {l2_squared}")
+        l2_squared = np.sum(vec ** 2)
+        print(f"l2_squared: {l2_squared}")
         
     return vec
         
@@ -118,6 +126,8 @@ def pca_dim_expasenalyze(file_name, data_num, target_var =0.9):
     cumulative_variance = np.cumsum(explained_variance_ratio)  # 累计解释方差
     # print("explained_variance_ratio:", explained_variance_ratio)
     # print("cumulative_variance:", cumulative_variance)
+    for i in range(len(cumulative_variance)):
+      print(f"{i} accumulate var: {cumulative_variance[i]}")
     
     target_k = np.argmax(cumulative_variance >= target_var) + 1  # 找到95%累计方差对应的k值
     print(f"target_var: {target_var}, target_k: {target_k}")
@@ -162,10 +172,307 @@ def huggingface_dataset_download() -> None:
                 cur_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
                 print(f"{cur_time}: Processed {doc_cnt} documents")
         print(f"download done")
+
+def transfer_csv_to_fvecs() -> None:
+  src_path = "/mnt/test/cc/project/ANN-Data/data/innerstreamv7_1000w/innerstreamv7_1000w.csv"
+  dst_path = "/home/web_server/cc/project/ANN-Data/data/innerstreamv7_1000w/innerstreamv7_1000w.fvecs"
+  emb_field = 'emb'
+
+  df = pd.read_csv(src_path)
+  df[emb_field] = df[emb_field].apply(ast.literal_eval)
+
+  data = np.array(df[emb_field].tolist())
+  write_fvecs(dst_path, data)
+
+  print(f"transfer {src_path} done, shape: {data.shape}")
+
+  pass
+
+
+def analyze_flash_neighbors():
+  src_path = "/mnt/test/cc/project/ANN-Data/data/statistics/codebooks/streamAnnRecallV13_1000w/index_flash_INT16_512_32_32_256_64_0_0_1.txt"
+  data_dim = 32
+
+  target_ids = {828963, 3049115, 3357286, 9904061, 7420272, 2155121}
+  in_degree_nodes = {}
+  out_degree_nodes = {}
+
+  with open(src_path, 'rb') as f:
+    c = f.read(8)
+    max_elements = struct.unpack('q', c)[0]
+    print(f'max_elements: {max_elements}')
+
+    c = f.read(8)
+    cur_element_count = struct.unpack('q', c)[0]
+    print(f"cur_element_cout: {cur_element_count}")
+   
+    c = f.read(8)
+    m = struct.unpack('q', c)[0]
+    
+    c = f.read(8)
+    max_M = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    max_M0 = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    ef_c = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    mult = struct.unpack('d', c)[0]
+
+    c = f.read(4)
+    max_level = struct.unpack('i', c)[0]
+
+    c = f.read(4)
+    enterpoint_node = struct.unpack('i', c)[0]
+
+    c = f.read(8)
+    size_data_per_element = struct.unpack('q', c)[0]
+    print(f'size_data_per_elements: {size_data_per_element}')
+
+    c = f.read(8)
+    size_links_level0 = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    size_links_per_element = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    offset_level0 = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    offset_link_list0 = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    offset_link_list = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    offset_linklist_data0 = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    offset_linklist_data = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    offset_data = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    label_offset = struct.unpack('q', c)[0]
+
+    for i in range(cur_element_count):
+      if i % 1000000 == 0:
+        print(f"processing doc {i}")
+
+      c = f.read(4)
+      neighbor_size = struct.unpack('i', c)[0]
+
+      c = f.read(max_M0 * 4)
+      neighbor_ids = struct.unpack(f'{max_M0}i', c)
+      neighbor_ids = [x for x in neighbor_ids if x != 0]
+
+      align_size = offset_data - 4 - max_M0 * 4 
+      c = f.read(align_size)
+
+      c = f.read(data_dim * 2)
+
+      c = f.read(8)
+      label = struct.unpack('q', c)[0]
+
+      align_size = size_data_per_element - label_offset - 8 
+      c = f.read(align_size)
+
+      if label in target_ids:
+        if label not in out_degree_nodes:
+          out_degree_nodes[label] = []
+        out_degree_nodes[label].extend(neighbor_ids)
+
+      for nid in neighbor_ids:
+        if nid in target_ids:
+          if nid not in in_degree_nodes:
+            in_degree_nodes[nid] = []
+          in_degree_nodes[nid].append(label)
+  print("in_degree_nodes:")
+  for key, val in in_degree_nodes.items():
+    print(f"{key}: \n{val}")
+
+  print("out degree nodes:")
+  for key, val in out_degree_nodes.items():
+    print(f"{key}: \n{val}")
+  
+ 
+def transfer_flash_to_ivecs():
+  src_path = "/mnt/test/cc/project/ANN-Data/data/statistics/codebooks/streamAnnRecallV13_1000w/index_flash_INT16_512_32_32_256_64_0_0_1.txt"
+  dst_path = '/home/web_server/cc/project/ANN-Data/data/streamAnnRecallV13_1000w/streamAnnRecallV13_1000w.flash.ivecs'
+  data_dim = 32
+
+  data_map = {}
+
+  with open(src_path, 'rb') as f:
+    c = f.read(8)
+    max_elements = struct.unpack('q', c)[0]
+    print(f'max_elements: {max_elements}')
+
+    c = f.read(8)
+    cur_element_count = struct.unpack('q', c)[0]
+    print(f"cur_element_cout: {cur_element_count}")
+   
+    c = f.read(8)
+    m = struct.unpack('q', c)[0]
+    
+    c = f.read(8)
+    max_M = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    max_M0 = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    ef_c = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    mult = struct.unpack('d', c)[0]
+
+    c = f.read(4)
+    max_level = struct.unpack('i', c)[0]
+
+    c = f.read(4)
+    enterpoint_node = struct.unpack('i', c)[0]
+
+    c = f.read(8)
+    size_data_per_element = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    size_links_level0 = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    size_links_per_element = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    offset_level0 = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    offset_link_list0 = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    offset_link_list = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    offset_linklist_data0 = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    offset_linklist_data = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    offset_data = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    label_offset = struct.unpack('q', c)[0]
+
+    for i in range(cur_element_count):
+      if i % 1000000 == 0:
+        print(f"processing doc {i}")
+
+      c = f.read(4)
+      neighbor_size = struct.unpack('i', c)[0]
+
+      c = f.read(max_M0 * 4)
+      neighbor_ids = struct.unpack(f'{max_M0}i', c)
+      neighbor_ids = [x for x in neighbor_ids if x != 0]
+
+      align_size = offset_data - 4 - max_M0 * 4 
+      c = f.read(align_size)
+
+      c = f.read(data_dim * 2)
+      data =np.frombuffer(c, dtype = np.uint16)
+
+      c = f.read(8)
+      label = struct.unpack('q', c)[0]
+
+      data_map[label] = data
+
+      align_size = size_data_per_element - label_offset - 8 
+      c = f.read(align_size)
+
+  datas = []
+  for i in range(cur_element_count):
+    data = data_map[i]
+    if len(data) == 0:
+      print(f"miss data: {i}")
+      break
+    datas.append(data)
+
+  write_ivecs(dst_path, datas)
+
+  return
+
+def transfer_hnsw_to_fvecs():
+  src_path ="/mnt/test/cc/project/ANN-Data/data/streamAnnRecallV13/flanker.index"
+  dst_path ="/home/web_server/cc/project/ANN-Data/data/streamAnnRecallV13/streamAnnRecallV13.fvecs"
+  data_dim = 128
+
+  embs = []
+  with open(src_path, 'rb') as f:
+    c = f.read(8)
+    offset_level0 = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    cur_element_count = struct.unpack('q', c)[0]
+    print(f"cur_element_cout: {cur_element_count}")
+
+    c = f.read(8)
+    size_data_per_element = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    label_offset = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    offset_data = struct.unpack('q', c)[0]
+
+    c = f.read(4)
+    max_level = struct.unpack('i', c)[0]
+
+    c = f.read(4)
+    enterpoint_node = struct.unpack('i', c)[0]
+
+    c = f.read(8)
+    max_M = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    max_M0 = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    m = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    mult = struct.unpack('d', c)[0]
+
+    c = f.read(8)
+    ef_c = struct.unpack('q', c)[0]
+
+    for i in range(cur_element_count):
+      if i % 1000000 == 0:
+        print(f"processing doc {i}")
+
+      c = f.read(4)
+      neighbor_size = struct.unpack('i', c)[0]
+
+      c = f.read(max_M0 * 4)
+      neighbor_ids = struct.unpack(f'{max_M0}i', c)
+
+      c = f.read(data_dim * 2)
+      emb = np.frombuffer(c, dtype = np.float16)
+      embs.append(emb)
+
+      c = f.read(8)
+      label = struct.unpack('q', c)[0]
+
+  data = np.array(embs, dtype=np.float32)
+  print(f'data.shape: {data.shape}')
+
+  write_fvecs(dst_path, data)
+
        
 def transfer_npy_to_fvecs() -> None:
-    src_path = "/home/chencheng12/project/ann_data/data/dup128d_80w/dup128d_785490.npy"
-    dst_path = "/home/chencheng12/project/ann_data/data/dup128d_80w/dup128d_80w.fvecs"
+    src_path = "/home/web_server/cc/project/ANN-Data/data/dup128d_1000w/dup128d_1000w.npy"
+    dst_path = "/home/web_server/cc/project/ANN-Data/data/dup128d_1000w/dup128d_1000w.fvecs"
     
     with open(src_path, "rb") as f:
         data = np.load(f)
@@ -178,8 +485,8 @@ def transfer_npy_to_fvecs() -> None:
 def split_dataset(seed = 42) -> None:
     # 将数据分割成 base / query 两个部分
     root_path = "../data/"
-    data_name = "cohere_zh"
-    n_query = 20000
+    data_name = "streamAnnRecallV13_1000w"
+    n_query = 20000 
 
     data_path = os.path.join(root_path, data_name, data_name + ".fvecs")
     base_path = os.path.join(root_path, data_name, data_name + "_base.fvecs")
@@ -201,20 +508,65 @@ def split_dataset(seed = 42) -> None:
     write_fvecs(query_path, query_index)
     
     print(f"split_data complete: base_index: {base_index.shape}, query_index: {query_index.shape}")
+
+def compute_flash_distance():
+    codebooks_path = "/home/web_server/cc/project/ANN-Data/data/statistics/codebooks/streamAnnRecallV13_1000w/codebooks_flash_INT16_512_32_32_256_64_0_0_1.txt"
+    data_path = ""
+    data_index = ""
+
+    data_dim = 128
+    subvector_num = 32
+    cluster_num = 256
+
+    subvector_len = data_dim // subvector_num
+
+    codebook = []
+    qmin = 0
+    qmax = 0
+
+    with open(codebooks_path, 'rb') as f:
+      c = f.read(4)
+      qmin = struct.unpack('f', c)[0]
+
+      c = f.read(4)
+      qmax = struct.unpack('f', c)[0]
+
+      # pre_length
+      for i in range(subvector_num):
+        c = f.read(8)
+
+      # subvector length
+      for i in range(subvector_num):
+        c = f.read(8)
+
+      for i in range(cluster_num):
+        c = f.read(data_dim * 4)
+        emb = np.frombuffer(c, dtype=np.float32)
+        codebook  = np.concatenate((codebook, emb))
+
+    print(f"codebook: {codebook}")
+    
     
 def compute_distance():
     # 计算距离
     root_path = "../data/"
-    data_name = "sift_single"
+    data_name = "streamAnnRecallV13_1000w"
     
+    #query_index = [3933039, 1792875, 3357286]
+    #base_index = [4565576,9037128,3805024,974634,9282379,374596,3527698,8739369,4990539,6871644]
+    #base_index  = [4565576, 9037128, 3805024, 974634, 828963, 3049115, 3357286, 9904061, 7420272, 2155121]
+    #base_index = [18029, 57229, 144109, 261273, 394725, 438897, 566596, 591719, 834950, 961365, 1387408, 1485444, 1495452, 1524518, 1552453, 1552453, 1603409, 1622548, 1660169, 1688405, 1801773, 2021484, 2164494, 2182905, 2215169, 2253181, 2277512, 2289074, 2644965, 2699245, 2962897, 3008745, 3505171, 3516857, 3689201, 3758071, 3879852, 3909430, 4565576, 4585857, 5310523, 5327576, 5545142, 5624507, 5682990, 5694123, 5703614, 6620281, 6795483, 7082722, 7133903, 7212362, 7737246, 7745214, 7767337, 8734600, 8810263, 8822651, 8841361, 9915145]
+    #base_index = [4565576, 3357286]
+
     query_index = [0]
-    # base_index = [1147585, 1404049, 638789, 1035362]
-    # base_index = [932085, 934876, 561813, 708177]
-    base_index = [2]
+    #base_index = [49465, 115429, 262170, 448172, 566596, 757996, 757996, 800445, 1368253, 1698402, 1777725, 1912386, 2038656, 2038656, 2053241, 2154848, 2163141, 2172419, 2474429, 2474429, 2622428, 3023438, 3191342, 3501706, 3733110, 4823601, 4958350, 7600450, 8525447, 9097410]
+    #base_index = [7027424]
+    base_index = [974634]
     
     base_path = os.path.join(root_path, data_name, data_name + "_base.fvecs")
     query_path = os.path.join(root_path, data_name, data_name + "_query.fvecs")
-    
+    #query_path = os.path.join(root_path, data_name, data_name + "_base.fvecs")
+
     base_data = read_fvecs(base_path)
     query_data = read_fvecs(query_path)
     
@@ -222,8 +574,6 @@ def compute_distance():
     base = base_data[base_index]
     
     # 计算距离
-    # ip_score = np.dot(query, base.T)
-    # print("ip_score: ", ip_score)
     
     l2_squared  = np.sum(query ** 2, axis=1, keepdims=True) + np.sum(base ** 2, axis=1) - 2 * np.dot(query, base.T)
     print("l2_score: ", l2_squared)
@@ -320,12 +670,13 @@ def compute_groundtruth_safe(base, query, topk=100, query_batch_size=100, base_b
 def generate_groundtruth() -> None:
     # 生成 groundtruth 文件
     root_path = "../data/"
-    data_name = "sift1m"
+    #data_name = "streamAnnRecallV13_1000w"
+    data_name = "streamAnnRecallV13_1000w"
     # 计算 query 的 topk groundtruth
     topk = 100
     
     use_pca = True
-    pca_dim = 96
+    pca_dim = 128
     
     base_path = os.path.join(root_path, data_name, data_name + "_base.fvecs")
     query_path = os.path.join(root_path, data_name, data_name + "_query.fvecs")
@@ -337,7 +688,7 @@ def generate_groundtruth() -> None:
         pca = PCA(n_components = pca_dim)
         base_data = pca.fit_transform(base_data)
         query_data = pca.transform(query_data)
-        groundtruth_path = os.path.join(root_path, data_name, data_name + "_groundtruth_pca_" + str(pca_dim) + ".ivecs")
+        groundtruth_path = os.path.join(root_path, data_name, data_name + f"_groundtruth_pca_{pca_dim}.ivecs")
         print("pca done")
     
     #groundtruth = compute_groundtruth_batch_with_parallel(base_data, query_data, topk, batch_size = 500, n_jobs = 1)
@@ -347,13 +698,8 @@ def generate_groundtruth() -> None:
     print("groundtruth done")
     
 def compare_recall() -> None:
-    base_groundtruth_path = "/home/chencheng12/project/ann_data/data/sift1m/sift1m_groundtruth.ivecs"
-    compare_groundtruth_path = "/home/chencheng12/project/ann_data/data/sift1m/sift1m_groundtruth_pca_96.ivecs"
-    topk = 1
-    
-    groundtruth_expase = read_ivecs(base_groundtruth_path)
-    dim_expase = groundtruth_expase.shape[1]
-    
+    base_groundtruth_path = "/home/web_server/cc/project/ANN-Data/data/streamAnnRecallV13_1000w/streamAnnRecallV13_1000w_groundtruth.ivecs"
+    compare_groundtruth_path = "/home/web_server/cc/project/ANN-Data/data/streamAnnRecallV13_1000w/streamAnnRecallV13_1000w_groundtruth_pca_128.ivecs"
     groundtruth_exp = read_ivecs(compare_groundtruth_path)
     dim_exp = groundtruth_exp.shape[1]
     
@@ -362,8 +708,10 @@ def compare_recall() -> None:
     # compare_dim = min(dim_expase, dim_exp)
     compare_dim = topk
     
-    groundtruth_expase = groundtruth_expase[:, :compare_dim]
-    groundtruth_exp = groundtruth_exp[:, :compare_dim]
+    compare_dim = min(dim_a, dim_b)
+    compare_dim = 60
+    groundtruth_a = groundtruth_a[:, :compare_dim]
+    groundtruth_b = groundtruth_b[:, :compare_dim]
     
     # 计算 recall
     recalls = []
@@ -441,19 +789,17 @@ def read_pq_codebook(file_path: str, dim: int, n_subvector: int, n_class: int, e
         
     return q_min, q_max, codebook, pca_data_mean, pca_principal
 
-def encode_pq(data: np.ndarray, codebook: np.ndarray, n_subvector: int, quantize_type: np.dtype, q_min: float, q_max: float, is_query: bool = True, pca_mean: np.ndarray = None, pca_principal: np.ndarray = None) -> np.ndarray:    
+def encode_pq(data: np.ndarray, codebook: np.ndarray, n_subvector: int, quantize_type: np.dtype, q_min: float, q_max: float, is_query: bool = True, pca_mean: np.ndarray = None, pca_principal: np.ndarray = None) -> (np.ndarray, np.ndarray):    
     # PQ 编码
     n_data, dim = data.shape
     n_class = codebook.shape[0]
     n_subvector_dim = dim // n_subvector
-    
+
+    # 数据, 每行 subvector 最后一位存放最佳 index
     pq_code = np.zeros((n_data, n_subvector, n_class + 1), dtype = quantize_type)
+    # 数据到 center 的距离 
+    dis_to_center = np.zeros((n_data), dtype = np.float32)
     for k in range(n_data):
-        # 计算 PCA
-        if pca_mean is not None:
-            data[k] = data[k] - pca_mean
-            data[k] = np.dot(data[k], pca_principal)
-        
         tmp_distance_table = np.zeros((n_subvector, n_class), dtype = float)
         
         data_min = np.inf
@@ -487,6 +833,8 @@ def encode_pq(data: np.ndarray, codebook: np.ndarray, n_subvector: int, quantize
             # 存储 subvector 的的最佳 center
             pq_code[k][i][n_class] = best_class
             data_max += max_dis
+            dis_to_center[k] += min_distance
+
         data_max -= data_min    
             
         # 根据 tmp_distance_table 填写量化距离
@@ -503,14 +851,16 @@ def encode_pq(data: np.ndarray, codebook: np.ndarray, n_subvector: int, quantize
                 percent = (tmp_distance_table[i][j] - quantized_min) / quantized_max
                 if percent > 1:
                     percent = 1
-                
-                dis = np.iinfo(quantize_type).max *  percent
+
+                if quantize_type == np.float32:
+                    dis = tmp_distance_table[i][j]
+                else:
+                    dis = np.iinfo(quantize_type).max *  percent
                 
                 # 存储 subvector 到各个 center 的量化距离
                 pq_code[k][i][j] = dis
-
               
-    return pq_code
+    return pq_code, dis_to_center
     
 def pq_dis(query_data, base_data):
     _, n_subvector, dim = query_data.shape
@@ -527,48 +877,95 @@ def pq_dis(query_data, base_data):
         for n in range(n_query):
             res = 0
             for i in range(n_subvector):
-                best_index = base_data[m][i][-1]
+                best_index = round(base_data[m][i][-1])
                 res += query_data[n][i][best_index]
             ret[n][m] = res
         
     return ret  
+
+def get_subvector_dis(query, data, subvec_size):
+  data_dim = query.shape[1]
+  subvec_len = data_dim // subvec_size
+
+  query_num = query.shape[0]
+  data_num = data.shape[0]
+
+  ret = np.zeros((query_num, data_num, subvec_size), dtype = np.float32)
+
+  for i in range(query_num):
+    for j in range(data_num):
+      debug_dis = np.sum((query[i] - data[j]) ** 2)
+      for k in range(subvec_size):
+        sub_query = query[i][k * subvec_len : (k + 1) * subvec_len]
+        sub_data = data[j][k * subvec_len : (k + 1) * subvec_len]
+
+        l2_dis = np.sum((sub_query - sub_data) ** 2)
+        ret[i][j][k] = l2_dis
+
+  return ret
+
+def get_data_by_flash_encode():
+    src_path = "/home/web_server/cc/project/ANN-Data/data/streamAnnRecallV13_1000w/streamAnnRecallV13_1000w.flash.ivecs"
+    target_encode = [113, 253, 162, 73, 30, 10, 44, 57, 144, 2, 217, 175, 105, 56, 65, 50, 179, 234, 243, 62, 240, 228, 81, 183, 5, 204, 158, 0, 248, 114, 51, 213]
+    
+
+    cand = []
+    datas = read_ivecs(src_path)
+
+    for i in range(len(datas)):
+      if i % 2000000:
+        print(f"process {i} ....")
+      data = datas[i]
+      if np.array_equal(data, target_encode):
+        cand.append(i)
+
+    print(f"cand: {cand}")
+
+    return
     
 def compute_pq_dis():
-    codebook_path = "/home/chencheng12/project/ann_data/data/codebooks/sift/codebooks_flash_INT16_512_32_32_256_128_0_1_0.txt"
-    base_data_path = "/home/chencheng12/project/ann_data/data/sift/sift_base.fvecs"
-    query_data_path = "/home/chencheng12/project/ann_data/data/sift/sift_query.fvecs"
+    codebook_path = "/home/web_server/cc/project/ANN-Data/data/statistics/codebooks/streamAnnRecallV13_1000w/codebooks_flash_INT16_512_32_32_256_64_0_0_1.txt"
+    base_data_path = "/home/web_server/cc/project/ANN-Data/data/streamAnnRecallV13_1000w/streamAnnRecallV13_1000w_base.fvecs"
+    query_data_path = "/home/web_server/cc/project/ANN-Data/data/streamAnnRecallV13_1000w/streamAnnRecallV13_1000w_query.fvecs"
     
     dim = 128
     n_subvector = 32
     n_class = 256
     quantize_type = np.uint16
+    #quantize_type = np.float32
     
     enable_pca = False
     pca_principal_dim = 0
     
-    # base_index = [998047, 993263, 939382, 794616, 749838]
-    # base_index = [932085, 934876, 561813, 708177, 706771, 695756, 435345, 701258, 455537, 872728, 36538, 562594, 908244, 600499, 893601, 619660, 562167, 746931, 565419, 236647, 568573,565814, 36267, 2176, 931632, 454263, 3752, 910119, 722642, 843384, 886630, 68299, 779712, 871066, 721706, 49874, 886222, 480497, 619829, 701919, 882, 87578,224263, 4009, 871568, 478814, 225116, 904911, 391655, 541845, 565484, 2837, 102903, 159953, 171663, 957845, 791852, 368702, 453447, 915482, 930567, 544275, 180955, 59844, 882946, 899809, 882961, 988166, 860056, 221339, 556209, 544202, 394507, 486457, 529986, 732473, 104122, 923811, 564914, 36139, 710644, 806773, 465294, 237161, 871048, 569837, 374617, 463781, 956733, 919197, 678385, 158759, 240996, 931948, 16429, 91348, 63349, 398306, 931721, 989762]
-    
-    base_index = [756694, 544275, 16429]
     query_index = [0]
+    #base_index = [828963, 3049115, 3357286, 9904061, 7420272, 2155121]
+    base_index = [9282379, 374596, 3527698, 8739369,4990539,6871643]
     
     base_data = read_fvecs(base_data_path)[base_index]
     query_data = read_fvecs(query_data_path)[query_index]
     
     q_min, q_max, codebook, pca_mean, pca_principal = read_pq_codebook(codebook_path, dim, n_subvector, n_class, enable_pca, pca_principal_dim)
-    pq_base_data = encode_pq(base_data, codebook, n_subvector, quantize_type, q_min, q_max, False)
-    pq_query_data = encode_pq(query_data, codebook, n_subvector, quantize_type, q_min, q_max, True)
+    pq_base_data, base2c_dis = encode_pq(base_data, codebook, n_subvector, quantize_type, q_min, q_max, False)
+    pq_query_data, query2c_dis = encode_pq(query_data, codebook, n_subvector, quantize_type, q_min, q_max, True)
     
     with np.printoptions(threshold=np.inf):
-        # print(f"pq_base_data: {pq_base_data}" )
-        # print(f"pq_base_data.shape: {pq_base_data.shape}")
-        # print(f"pq_base_data, quant_data: {pq_base_data[:, :, 256:]}")
-        pass
+      #print(f"codebook: {codebook}")
+      #print(f"pq_base_data: {pq_base_data}" )
+      #print(f"pq_base_data.shape: {pq_base_data.shape}")
+      #print(f"pq_base_data, quant_data: {pq_base_data[:, :, 256:]}")
+      pass
     
     dis = pq_dis(pq_query_data, pq_base_data)
     # # dis = pq_dis(pq_base_data, pq_query_data)
     print(f"pq_dis: {dis}")
-    
+    print(f"query_2_center_dis: {query2c_dis}")
+    print(f"base_2_center_dis: {base2c_dis}")
+
+    l2_squared  = np.sum(query_data ** 2, axis=1, keepdims=True) + np.sum(base_data ** 2, axis=1) - 2 * np.dot(query_data, base_data.T)
+    print(f"l2 dis: {l2_squared}")
+
+    l2_subvec_dis = get_subvector_dis(query_data, base_data, n_subvector)
+    print(f"l2 subvec dis: {l2_subvec_dis}")
     
     
 def compute_ip_dis():
@@ -601,23 +998,31 @@ if __name__ == "__main__":
   try:
 
     #huggingface_dataset_download()
-    # transfer_npy_to_fvecs()
+    #transfer_npy_to_fvecs()
+    #transfer_csv_to_fvecs()
+
+    #transfer_hnsw_to_fvecs()
     
     #split_dataset()
     #generate_groundtruth()
     
     #read_fvecs("/mnt/test/cc/project/ANN-Data/data/bigcode/bigcode_base.fvecs", True)
     
-    # read_vecs_at("/home/chencheng12/project/ann_data/data/sift_single/sift_single_query.fvecs", 0)
-    #read_vecs_at("/mnt/test/cc/project/ANN-Data/data/sift1m/sift1m_base.fvecs", 2)
+    #read_vecs_at("/home/chencheng12/project/ann_data/data/sift_single/sift_single_query.fvecs", 0)
+    #read_vecs_at("/home/web_server/cc/project/ANN-Data/data/streamAnnRecallV13_1000w/streamAnnRecallV13_1000w.flash.ivecs", 3357286)
+    #read_vecs_at("/home/web_server/cc/project/ANN-Data/data/streamAnnRecallV13_1000w/streamAnnRecallV13_1000w.fvecs", 3357286)
+    #read_vecs_at("/home/web_server/cc/project/ANN-Data/data/streamAnnRecallV13_1000w/streamAnnRecallV13_1000w.flash.ivecs", 7027424)
 
-    # compute_distance()
+    #compute_distance()
+    #compute_pq_dis()
+    #analyze_flash_neighbors()
+    #transfer_flash_to_ivecs()
     
-    #pca_dim_analyze("/mnt/test/cc/project/ANN-Data/data/bigcode/bigcode_base.fvecs", 200000, 0.90)
-    # compare_recall()
+    #pca_dim_analyze("/mnt/test/cc/project/ANN-Data/data//sift1m_base.fvecs", 200000, 0.90)
+    compare_recall()
+    #get_data_by_flash_encode()
     
     # read_pq_codebook("/home/chencheng12/project/ann_data/data/codebooks/sift/codebooks_flash_INT8_512_32_16_256_64_0_1_0.txt", 128, 16, 256)
-    # compute_pq_dis()
     
     # compute_ip_dis()
     
@@ -625,5 +1030,4 @@ if __name__ == "__main__":
   finally:
     from joblib.externals.loky import get_reusable_executor
     get_reusable_executor().shutdown(wait=True)
-
     pass
