@@ -188,14 +188,125 @@ def transfer_csv_to_fvecs() -> None:
 
   pass
 
+def analyze_hnsw_neighbors():
+  src_path = "/mnt/test/cc/project/ANN-Data/data/statistics/codebooks/streamAnnRecallV13_1000w/index_hnsw_INT16_512_32.txt"
+  data_dim = 128
+
+  print(f"analyze hnsw neighbors: {src_path}")
+
+  #target_ids = {828963, 3049115, 3357286, 9904061, 7420272, 2155121}
+  target_ids = {1604028}
+
+  internal_in_degree_nodes = {}
+  in_degree_nodes = {}
+  out_degree_nodes = {}
+
+  id_map = {}
+
+  with open(src_path, 'rb') as f:
+    # offsetlevel 0
+    c = f.read(8)
+
+    c = f.read(8)
+    max_element = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    cur_element_count = struct.unpack('q', c)[0]
+    print(f"cur_element_count: {cur_element_count}")
+
+    c = f.read(8)
+    size_per_data = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    label_offset = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    data_offset = struct.unpack('q', c)[0]
+
+    c = f.read(4)
+    max_level = struct.unpack('i', c)[0]
+
+    c = f.read(4)
+    enter_point = struct.unpack('i', c)[0]
+
+    c = f.read(8)
+    max_M = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    max_M0 = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    M = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    mult = struct.unpack('d', c)[0]
+
+    c = f.read(8)
+    ef_c = struct.unpack('q', c)[0]
+
+    for i in range(cur_element_count):
+      if i % 100000 == 0:
+        print(f"processing doc {i} ...")
+
+      c = f.read(4)
+      neighbor_size = struct.unpack('i', c)[0]
+
+      c = f.read(max_M0 * 4)
+      neighbor_ids = struct.unpack(f'{max_M0}i', c)
+      neighbor_ids = [x for x in neighbor_ids if x != 0]
+
+      c = f.read(data_dim * 4)
+
+      c = f.read(8)
+      label = struct.unpack('q', c)[0]
+      id_map[i] = label
+
+      if label not in out_degree_nodes:
+        out_degree_nodes[label] = []
+      out_degree_nodes[label].extend(neighbor_ids)
+
+      for nid in neighbor_ids:
+        if nid not in internal_in_degree_nodes:
+          internal_in_degree_nodes[nid] = []
+        internal_in_degree_nodes[nid].append(label)
+
+  ret_in_degree_nodes = {}
+  ret_out_degree_nodes = {}
+
+  # 变换 out_degree_nodes
+  for label, neighbor_ids in out_degree_nodes.items():
+    neighbor_labels = list(map(lambda x: id_map[x], neighbor_ids))
+
+    if label in target_ids:
+      ret_out_degree_nodes[label] = neighbor_labels
+
+  # 变换 in_degree_nodes
+  for nid, neighbor_labels in internal_in_degree_nodes.items():
+    label = id_map[nid]
+
+    if label in target_ids:
+      ret_in_degree_nodes[label] = neighbor_labels
+
+  print("in_degree_nodes:")
+  for key, val in ret_in_degree_nodes.items():
+    print(f"{key}: \n{val}")
+
+  print("out degree nodes:")
+  for key, val in ret_out_degree_nodes.items():
+    print(f"{key}: \n{val}")
+  
+  return
 
 def analyze_flash_neighbors():
   src_path = "/mnt/test/cc/project/ANN-Data/data/statistics/codebooks/streamAnnRecallV13_1000w/index_flash_INT16_512_32_32_256_64_0_0_1.txt"
-  data_dim = 32
+  data_dim = 128
 
   target_ids = {828963, 3049115, 3357286, 9904061, 7420272, 2155121}
   in_degree_nodes = {}
   out_degree_nodes = {}
+
+
+  id_map = {}
 
   with open(src_path, 'rb') as f:
     c = f.read(8)
@@ -269,27 +380,24 @@ def analyze_flash_neighbors():
       neighbor_ids = struct.unpack(f'{max_M0}i', c)
       neighbor_ids = [x for x in neighbor_ids if x != 0]
 
-      align_size = offset_data - 4 - max_M0 * 4 
-      c = f.read(align_size)
-
-      c = f.read(data_dim * 2)
+      c = f.read(data_dim * 4)
 
       c = f.read(8)
       label = struct.unpack('q', c)[0]
-
-      align_size = size_data_per_element - label_offset - 8 
-      c = f.read(align_size)
-
+      id_map[i] = label
+      
       if label in target_ids:
         if label not in out_degree_nodes:
           out_degree_nodes[label] = []
-        out_degree_nodes[label].extend(neighbor_ids)
+        out_degree_nodes[label].extend(list(map(lambda x: id_map[x], neibor_ids)))
 
       for nid in neighbor_ids:
+        nid = id_map[nid]
         if nid in target_ids:
           if nid not in in_degree_nodes:
             in_degree_nodes[nid] = []
           in_degree_nodes[nid].append(label)
+
   print("in_degree_nodes:")
   for key, val in in_degree_nodes.items():
     print(f"{key}: \n{val}")
@@ -551,17 +659,13 @@ def compute_distance():
     # 计算距离
     root_path = "../data/"
     data_name = "streamAnnRecallV13_1000w"
+    #data_name = "sift1m"
     
     #query_index = [3933039, 1792875, 3357286]
-    #base_index = [4565576,9037128,3805024,974634,9282379,374596,3527698,8739369,4990539,6871644]
-    #base_index  = [4565576, 9037128, 3805024, 974634, 828963, 3049115, 3357286, 9904061, 7420272, 2155121]
-    #base_index = [18029, 57229, 144109, 261273, 394725, 438897, 566596, 591719, 834950, 961365, 1387408, 1485444, 1495452, 1524518, 1552453, 1552453, 1603409, 1622548, 1660169, 1688405, 1801773, 2021484, 2164494, 2182905, 2215169, 2253181, 2277512, 2289074, 2644965, 2699245, 2962897, 3008745, 3505171, 3516857, 3689201, 3758071, 3879852, 3909430, 4565576, 4585857, 5310523, 5327576, 5545142, 5624507, 5682990, 5694123, 5703614, 6620281, 6795483, 7082722, 7133903, 7212362, 7737246, 7745214, 7767337, 8734600, 8810263, 8822651, 8841361, 9915145]
-    #base_index = [4565576, 3357286]
 
     query_index = [0]
-    #base_index = [49465, 115429, 262170, 448172, 566596, 757996, 757996, 800445, 1368253, 1698402, 1777725, 1912386, 2038656, 2038656, 2053241, 2154848, 2163141, 2172419, 2474429, 2474429, 2622428, 3023438, 3191342, 3501706, 3733110, 4823601, 4958350, 7600450, 8525447, 9097410]
-    #base_index = [7027424]
-    base_index = [974634]
+    #query_index = [4565576]
+    base_index  = [4565576, 9037128, 3805024, 974634, 828963, 3049115, 3357286, 9904061, 7420272, 2155121]
     
     base_path = os.path.join(root_path, data_name, data_name + "_base.fvecs")
     query_path = os.path.join(root_path, data_name, data_name + "_query.fvecs")
@@ -572,11 +676,23 @@ def compute_distance():
     
     query = query_data[query_index]
     base = base_data[base_index]
+
+
+    sub_vec_num = 4
+    sub_vec_dim = query.shape[1] // sub_vec_num
+    for i in range(sub_vec_num):
+      sub_query = query[:, i * sub_vec_dim : (i + 1) * sub_vec_dim]
+      sub_base = base[:, i * sub_vec_dim : (i + 1) * sub_vec_dim]
+
+      l2_dis  = np.sum(sub_query ** 2, axis=1, keepdims=True) + np.sum(sub_base ** 2, axis=1) - 2 * np.dot(sub_query, sub_base.T)
+      print(f"{i} : {l2_dis}", end = "\t")
+
     
     # 计算距离
     
     l2_squared  = np.sum(query ** 2, axis=1, keepdims=True) + np.sum(base ** 2, axis=1) - 2 * np.dot(query, base.T)
-    print("l2_score: ", l2_squared)
+    print("total l2_score: ", l2_squared)
+
     
 def compute_batch_id(id, base, query, topk, base_sqr = None):
     # 计算距离
@@ -666,6 +782,30 @@ def compute_groundtruth_safe(base, query, topk=100, query_batch_size=100, base_b
         final_topk_indices[q_start:q_end] = batch_indices
 
     return final_topk_indices 
+
+def analyze_query_2_data_dis():
+    root_path = '../data'
+
+    data_name = "streamAnnRecallV13_1000w"
+    query_num = 100
+    
+    use_pca = True
+    pca_dim = 128
+    
+    base_path = os.path.join(root_path, data_name, data_name + "_base.fvecs")
+    query_path = os.path.join(root_path, data_name, data_name + "_query.fvecs")
+    dst_path = os.path.join(root_path, data_name, data_name + f"_hist_{query_num}.fvecs")
+    
+    base = read_fvecs(base_path)
+    query = read_fvecs(query_path)[:query_num, :]
+
+
+    l2_dis  = np.sum(query ** 2, axis=1, keepdims=True) + np.sum(base ** 2, axis=1) - 2 * np.dot(query, base.T)
+
+    write_fvecs(dst_path, l2_dis)
+
+    print("analyze done")
+ 
       
 def generate_groundtruth() -> None:
     # 生成 groundtruth 文件
@@ -1000,7 +1140,6 @@ if __name__ == "__main__":
     #huggingface_dataset_download()
     #transfer_npy_to_fvecs()
     #transfer_csv_to_fvecs()
-
     #transfer_hnsw_to_fvecs()
     
     #split_dataset()
@@ -1013,13 +1152,16 @@ if __name__ == "__main__":
     #read_vecs_at("/home/web_server/cc/project/ANN-Data/data/streamAnnRecallV13_1000w/streamAnnRecallV13_1000w.fvecs", 3357286)
     #read_vecs_at("/home/web_server/cc/project/ANN-Data/data/streamAnnRecallV13_1000w/streamAnnRecallV13_1000w.flash.ivecs", 7027424)
 
-    #compute_distance()
+    #analyze_query_2_data_dis()
+
+    compute_distance()
     #compute_pq_dis()
     #analyze_flash_neighbors()
+    #analyze_hnsw_neighbors()
     #transfer_flash_to_ivecs()
     
     #pca_dim_analyze("/mnt/test/cc/project/ANN-Data/data//sift1m_base.fvecs", 200000, 0.90)
-    compare_recall()
+    #compare_recall()
     #get_data_by_flash_encode()
     
     # read_pq_codebook("/home/chencheng12/project/ann_data/data/codebooks/sift/codebooks_flash_INT8_512_32_16_256_64_0_1_0.txt", 128, 16, 256)
