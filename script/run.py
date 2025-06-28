@@ -188,6 +188,111 @@ def transfer_csv_to_fvecs() -> None:
 
   pass
 
+def get_hnsw_v2_linkdata():
+  src_path = "/home/web_server/cc/project/ANN-Flash/statistics/codebooks/sift1m/index_hnsw-v2_INT16_512_32.txt"
+  data_dim  = 128
+  subvec_num = 4
+  target_ids = {221339}
+
+  print(f"show hnsw_v2 linkdata: {src_path}")
+  id_map = {}
+  with open(src_path, 'rb') as f:
+    # offsetlevel 0
+    c = f.read(8)
+
+    c = f.read(8)
+    max_element = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    cur_element_count = struct.unpack('q', c)[0]
+    print(f"cur_element_count: {cur_element_count}")
+
+    c = f.read(8)
+    size_per_data = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    linkdata_offset = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    label_offset = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    data_offset = struct.unpack('q', c)[0]
+
+    c = f.read(4)
+    max_level = struct.unpack('i', c)[0]
+
+    c = f.read(4)
+    enter_point = struct.unpack('i', c)[0]
+
+    c = f.read(8)
+    max_M = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    max_M0 = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    M = struct.unpack('q', c)[0]
+
+    c = f.read(8)
+    mult = struct.unpack('d', c)[0]
+
+    c = f.read(8)
+    ef_c = struct.unpack('q', c)[0]
+
+    tmp_target_link_data = {}
+    for i in range(cur_element_count):
+      if i % 100000 == 0:
+        print(f"processing doc {i} ...")
+
+      c = f.read(4)
+      neighbor_size = struct.unpack('i', c)[0]
+
+      c = f.read(max_M0 * 4)
+      neighbor_ids = struct.unpack(f'{max_M0}i', c)
+      neighbor_ids = [x for x in neighbor_ids if x != 0]
+
+      n_link_data = {}
+      for j in range(len(neighbor_ids)):
+        nid = neighbor_ids[j]
+        n_link_data[nid]  = {}
+
+        c = f.read(4)
+        dis = struct.unpack('f', c)[0]
+        n_link_data[nid]['dis'] = dis
+
+        c = f.read(subvec_num * 4)
+        sub_dis = np.frombuffer(c, dtype = np.float32)
+        n_link_data[nid]['sub_dis'] = sub_dis
+
+      left_link_data_size = (max_M0 - len(neighbor_ids)) * (subvec_num + 1) * 4
+      c = f.read(left_link_data_size)
+
+      c = f.read(data_dim * 4)
+
+      c = f.read(8)
+      label = struct.unpack('q', c)[0]
+      id_map[i] = label
+
+      if label in target_ids:
+        tmp_target_link_data[label] = n_link_data
+
+    target_link_data = {}
+    for k, val in tmp_target_link_data.items():
+      target_link_data[k] = {}
+
+      n_link_data = {}
+      for n_k, n_val in val.items():
+        n_link_data[id_map[n_k]] = n_val
+
+      target_link_data[k] = n_link_data
+
+    pprint.pprint(target_link_data)
+
+  return
+
+  
+
 def analyze_hnsw_neighbors():
   src_path = "/mnt/test/cc/project/ANN-Data/data/statistics/codebooks/streamAnnRecallV13_1000w/index_hnsw_INT16_512_32.txt"
   data_dim = 128
@@ -658,18 +763,18 @@ def compute_flash_distance():
 def compute_distance():
     # 计算距离
     root_path = "../data/"
-    data_name = "streamAnnRecallV13_1000w"
-    #data_name = "sift1m"
+    #data_name = "streamAnnRecallV13_1000w"
+    data_name = "sift1m"
     
     #query_index = [3933039, 1792875, 3357286]
 
-    query_index = [0]
-    #query_index = [4565576]
-    base_index  = [4565576, 9037128, 3805024, 974634, 828963, 3049115, 3357286, 9904061, 7420272, 2155121]
+    #query_index = [221339]
+    query_index = [221339]
+    base_index = [222238, 795394]
     
     base_path = os.path.join(root_path, data_name, data_name + "_base.fvecs")
-    query_path = os.path.join(root_path, data_name, data_name + "_query.fvecs")
-    #query_path = os.path.join(root_path, data_name, data_name + "_base.fvecs")
+    #query_path = os.path.join(root_path, data_name, data_name + "_query.fvecs")
+    query_path = os.path.join(root_path, data_name, data_name + "_base.fvecs")
 
     base_data = read_fvecs(base_path)
     query_data = read_fvecs(query_path)
@@ -1159,15 +1264,14 @@ if __name__ == "__main__":
     #analyze_flash_neighbors()
     #analyze_hnsw_neighbors()
     #transfer_flash_to_ivecs()
+    #get_hnsw_v2_linkdata()
     
     #pca_dim_analyze("/mnt/test/cc/project/ANN-Data/data//sift1m_base.fvecs", 200000, 0.90)
     #compare_recall()
     #get_data_by_flash_encode()
     
     # read_pq_codebook("/home/chencheng12/project/ann_data/data/codebooks/sift/codebooks_flash_INT8_512_32_16_256_64_0_1_0.txt", 128, 16, 256)
-    
     # compute_ip_dis()
-    
     # random_emb(128)
   finally:
     from joblib.externals.loky import get_reusable_executor
