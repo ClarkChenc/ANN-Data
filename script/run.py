@@ -769,8 +769,8 @@ def compute_distance():
     #query_index = [3933039, 1792875, 3357286]
 
     #query_index = [221339]
-    query_index = [221339]
-    base_index = [222238, 795394]
+    query_index = [33]
+    base_index = [5452]
     
     base_path = os.path.join(root_path, data_name, data_name + "_base.fvecs")
     #query_path = os.path.join(root_path, data_name, data_name + "_query.fvecs")
@@ -783,7 +783,7 @@ def compute_distance():
     base = base_data[base_index]
 
 
-    sub_vec_num = 4
+    sub_vec_num = 2
     sub_vec_dim = query.shape[1] // sub_vec_num
     for i in range(sub_vec_num):
       sub_query = query[:, i * sub_vec_dim : (i + 1) * sub_vec_dim]
@@ -910,6 +910,56 @@ def analyze_query_2_data_dis():
     write_fvecs(dst_path, l2_dis)
 
     print("analyze done")
+    
+def generate_groundtruth_with_direction() -> None:
+    # 生成 groundtruth 文件
+    root_path = "../data/"
+    #data_name = "streamAnnRecallV13_1000w"
+    data_name = "sift1m"
+    # 计算 query 的 topk groundtruth
+    topk = 100
+    subvec_num = 1
+    
+    base_path = os.path.join(root_path, data_name, data_name + "_base.fvecs")
+    query_path = os.path.join(root_path, data_name, data_name + "_query.fvecs")
+    groundtruth_path = os.path.join(root_path, data_name, data_name + "_groundtruth.ivecs")
+    
+    base = read_fvecs(base_path)
+    query = read_fvecs(query_path)
+    subvec_dim = query.shape[1] // subvec_num
+    
+    dis_list = []
+    # for i in range(len(query)):
+    for i in range(1):
+        if i % 100000 == 0:
+            print(f"processing query {i} ...")
+        q = query[i]
+        
+        candidate = set()
+        for j in range(subvec_num):
+            sub_q = q[j * subvec_dim : (j + 1) * subvec_dim]
+            sub_base = base[:, j * subvec_dim : (j + 1) * subvec_dim]
+            
+            topk_index = compute_groundtruth_safe(sub_base, sub_q.reshape(1, -1), topk, query_batch_size=1, base_batch_size=100000)
+            for k in range(len(topk_index[0])):
+                candidate.add(int(topk_index[0][k]))
+        print(candidate)
+        
+        index = list(candidate)
+        selected = base[index]  # shape: (n, dim)
+        # 计算每一行与 query 的 L2 距离
+        dists = np.linalg.norm(selected - q, axis=1)
+
+        # 取距离最小的 k 个的索引（在 index 中的相对位置）
+        topk_pos = np.argpartition(dists, k)[:k]
+        # 可选：按真实距离排序
+        topk_pos = topk_pos[np.argsort(dists[topk_pos])]
+          
+        print(f"{topk_pos}")
+    print("dis_list done")
+    
+    # write_ivecs(groundtruth_path, groundtruth)
+    return
  
       
 def generate_groundtruth() -> None:
@@ -1249,17 +1299,18 @@ if __name__ == "__main__":
     
     #split_dataset()
     #generate_groundtruth()
+    # generate_groundtruth_with_direction()
     
     #read_fvecs("/mnt/test/cc/project/ANN-Data/data/bigcode/bigcode_base.fvecs", True)
     
     #read_vecs_at("/home/chencheng12/project/ann_data/data/sift_single/sift_single_query.fvecs", 0)
     #read_vecs_at("/home/web_server/cc/project/ANN-Data/data/streamAnnRecallV13_1000w/streamAnnRecallV13_1000w.flash.ivecs", 3357286)
     #read_vecs_at("/home/web_server/cc/project/ANN-Data/data/streamAnnRecallV13_1000w/streamAnnRecallV13_1000w.fvecs", 3357286)
-    #read_vecs_at("/home/web_server/cc/project/ANN-Data/data/streamAnnRecallV13_1000w/streamAnnRecallV13_1000w.flash.ivecs", 7027424)
+    read_vecs_at("/home/chencheng12/project/ann_data/data/sift1m/sift1m_groundtruth.ivecs", 0)
 
     #analyze_query_2_data_dis()
 
-    compute_distance()
+    # compute_distance()
     #compute_pq_dis()
     #analyze_flash_neighbors()
     #analyze_hnsw_neighbors()
@@ -1273,6 +1324,7 @@ if __name__ == "__main__":
     # read_pq_codebook("/home/chencheng12/project/ann_data/data/codebooks/sift/codebooks_flash_INT8_512_32_16_256_64_0_1_0.txt", 128, 16, 256)
     # compute_ip_dis()
     # random_emb(128)
+    pass
   finally:
     from joblib.externals.loky import get_reusable_executor
     get_reusable_executor().shutdown(wait=True)
