@@ -513,9 +513,9 @@ def analyze_flash_neighbors():
   
  
 def transfer_flash_to_ivecs():
-  src_path = "/mnt/test/cc/project/ANN-Data/data/statistics/codebooks/streamAnnRecallV13_1000w/index_flash_INT16_512_32_32_256_64_0_0_1.txt"
-  dst_path = '/home/web_server/cc/project/ANN-Data/data/streamAnnRecallV13_1000w/streamAnnRecallV13_1000w.flash.ivecs'
-  data_dim = 32
+  src_path = "/home/chencheng12/project/ann_data/data/codebooks/sift1m/index_flash_400_32_INT16_64_512_PCA_128.txt"
+  dst_path = '/home/chencheng12/project/ann_data/data/codebooks/sift1m/index_flash_400_32_INT16_64_512_PCA_128.flash.ivecs'
+  subvec_size = 64
 
   data_map = {}
 
@@ -578,6 +578,7 @@ def transfer_flash_to_ivecs():
 
     c = f.read(8)
     label_offset = struct.unpack('q', c)[0]
+    print(f"{label_offset}")
 
     for i in range(cur_element_count):
       if i % 1000000 == 0:
@@ -593,13 +594,15 @@ def transfer_flash_to_ivecs():
       align_size = offset_data - 4 - max_M0 * 4 
       c = f.read(align_size)
 
-      c = f.read(data_dim * 2)
+      c = f.read(subvec_size * 2)
       data =np.frombuffer(c, dtype = np.uint16)
 
       c = f.read(8)
       label = struct.unpack('q', c)[0]
-
+      
+      # print(f"label: {label}")
       data_map[label] = data
+      
 
       align_size = size_data_per_element - label_offset - 8 
       c = f.read(align_size)
@@ -966,12 +969,13 @@ def generate_groundtruth() -> None:
     # 生成 groundtruth 文件
     root_path = "../data/"
     #data_name = "streamAnnRecallV13_1000w"
-    data_name = "streamAnnRecallV13_1000w"
+    data_name = "sift1m"
     # 计算 query 的 topk groundtruth
     topk = 100
     
     use_pca = True
     pca_dim = 128
+    sample_ratio = 0.1
     
     base_path = os.path.join(root_path, data_name, data_name + "_base.fvecs")
     query_path = os.path.join(root_path, data_name, data_name + "_query.fvecs")
@@ -980,8 +984,13 @@ def generate_groundtruth() -> None:
     base_data = read_fvecs(base_path)
     query_data = read_fvecs(query_path)
     if use_pca:
+        sample_num = int(base_data.shape[0] * sample_ratio)
+        indices = np.random.permutation(sample_num)
+        sample_data = base_data[indices]
         pca = PCA(n_components = pca_dim)
-        base_data = pca.fit_transform(base_data)
+        pca.fit(sample_data)
+        
+        base_data = pca.transform(base_data)
         query_data = pca.transform(query_data)
         groundtruth_path = os.path.join(root_path, data_name, data_name + f"_groundtruth_pca_{pca_dim}.ivecs")
         print("pca done")
@@ -993,18 +1002,16 @@ def generate_groundtruth() -> None:
     print("groundtruth done")
     
 def compare_recall() -> None:
-    base_groundtruth_path = "/home/web_server/cc/project/ANN-Data/data/streamAnnRecallV13_1000w/streamAnnRecallV13_1000w_groundtruth.ivecs"
-    compare_groundtruth_path = "/home/web_server/cc/project/ANN-Data/data/streamAnnRecallV13_1000w/streamAnnRecallV13_1000w_groundtruth_pca_128.ivecs"
-    groundtruth_exp = read_ivecs(compare_groundtruth_path)
-    dim_exp = groundtruth_exp.shape[1]
+    base_groundtruth_path = "/home/chencheng12/project/ann_data/data/sift1m/sift1m_groundtruth.ivecs"
+    compare_groundtruth_path = "/home/chencheng12/project/ann_data/data/sift1m/sift1m_groundtruth_pca_128.ivecs"
     
-    query_num = groundtruth_expase.shape[0]
+    groundtruth_a = read_ivecs(base_groundtruth_path) 
+    groundtruth_b = read_ivecs(compare_groundtruth_path)
+    dim_exp = groundtruth_a.shape[1]
     
-    # compare_dim = min(dim_expase, dim_exp)
-    compare_dim = topk
-    
-    compare_dim = min(dim_a, dim_b)
-    compare_dim = 60
+    query_num = groundtruth_a.shape[0]
+  
+    compare_dim = 50
     groundtruth_a = groundtruth_a[:, :compare_dim]
     groundtruth_b = groundtruth_b[:, :compare_dim]
     
@@ -1014,8 +1021,8 @@ def compare_recall() -> None:
     total_dim_num = query_num * compare_dim
     correct_dim_num = 0
     for i in range(query_num):
-        a = set(groundtruth_expase[i])
-        b = set(groundtruth_exp[i])
+        a = set(groundtruth_a[i])
+        b = set(groundtruth_b[i])
         
         # 计算 recall
         correct_dim_num += len(a.intersection(b))
@@ -1039,6 +1046,7 @@ def compute_kmeans(file_path: str, n_subvector: int, n_class: int) -> None:
     print("pq done")
     
 def read_pq_codebook(file_path: str, dim: int, n_subvector: int, n_class: int, enable_pca: bool = False, pca_principal_dim: int = 0) -> None:
+    print(f"load codebook from {file_path}")
     q_min = 0.0
     q_max = 0.0
     
@@ -1046,35 +1054,32 @@ def read_pq_codebook(file_path: str, dim: int, n_subvector: int, n_class: int, e
     subvector_lengths = []
     
     with open(file_path, 'rb') as f:
-        q_min = struct.unpack('f', f.read(4))[0]
-        q_max = struct.unpack('f', f.read(4))[0]
-        print(f"q_min: {q_min}, q_max: {q_max}")
-        
-        for i in range(n_subvector):
-            pre_length = struct.unpack('q', f.read(8))[0]
-            pre_lengths.append(pre_length)
-        for i in range(n_subvector):
-            subvector_length = struct.unpack('q', f.read(8))[0]
-            subvector_lengths.append(subvector_length)
-        # print(f"pre_lengths: {pre_lengths}")
-        # print(f"subvector_lengths: {subvector_lengths}")
-        
         pca_data_mean = None
         pca_principal = None
         if enable_pca:
-            pca_data_mean = np.zeros((dim), dtype = np.float32)
-            for i in range(dim):
-                pca_data_mean[i] = struct.unpack('f', f.read(4))[0]
-            print(f"pca_data_mean shape: {pca_data_mean.shape}")
-            
-            pca_principal = np.zeros((dim, pca_principal_dim), dtype = np.float32)
-            
-            for i in range(dim):
-                for j in range(pca_principal_dim):
-                    pca_principal[i][j] = struct.unpack('f', f.read(4))[0]
-            print(f"pca_principal shape: {pca_principal.shape}")
-            
+          pca_data_mean = np.zeros((dim), dtype = np.float32)
+          for i in range(dim):
+              pca_data_mean[i] = struct.unpack('f', f.read(4))[0]
+          print(f"pca_data_mean shape: {pca_data_mean.shape}")
+          
+          pca_principal = np.zeros((dim, pca_principal_dim), dtype = np.float32)
+          for i in range(dim):
+              for j in range(pca_principal_dim):
+                  pca_principal[i][j] = struct.unpack('f', f.read(4))[0]
+          print(f"pca_principal shape: {pca_principal.shape}")
+          
+        q_min = struct.unpack('f', f.read(4))[0]
+        q_max = struct.unpack('f', f.read(4))[0]
+        print(f"q_min: {q_min}, q_max: {q_max}")
     
+        for i in range(n_subvector):
+            pre_length = struct.unpack('q', f.read(8))[0]
+            pre_lengths.append(pre_length)
+            
+        for i in range(n_subvector):
+            subvector_length = struct.unpack('q', f.read(8))[0]
+            subvector_lengths.append(subvector_length)
+            
         codebook = np.zeros((n_class, dim), dtype = np.float32)
         for i in range(n_class):
             for j in range(dim):
@@ -1082,26 +1087,42 @@ def read_pq_codebook(file_path: str, dim: int, n_subvector: int, n_class: int, e
         print(f"codebook shape: {codebook.shape}")
         # print(f"codebook: {codebook}")
         
-    return q_min, q_max, codebook, pca_data_mean, pca_principal
+    return q_min, q_max, codebook, pca_data_mean, pca_principal, pre_lengths
 
-def encode_pq(data: np.ndarray, codebook: np.ndarray, n_subvector: int, quantize_type: np.dtype, q_min: float, q_max: float, is_query: bool = True, pca_mean: np.ndarray = None, pca_principal: np.ndarray = None) -> (np.ndarray, np.ndarray):    
+
+
+def encode_pq(data: np.ndarray, codebook: np.ndarray, pre_lengths: np.ndarray, quantize_type: np.dtype, q_min: float, q_max: float, is_query: bool = True, pca_mean: np.ndarray = None, pca_principal: np.ndarray = None) -> (np.ndarray, np.ndarray):    
     # PQ 编码
     n_data, dim = data.shape
     n_class = codebook.shape[0]
-    n_subvector_dim = dim // n_subvector
+    n_subvector = len(pre_lengths)
+        
+    subvector_len = []
+    for i in range(n_subvector):
+      if i == n_subvector - 1:
+          subvector_len.append(dim - pre_lengths[i])
+      else:
+        subvector_len.append(pre_lengths[i + 1] - pre_lengths[i])
 
     # 数据, 每行 subvector 最后一位存放最佳 index
     pq_code = np.zeros((n_data, n_subvector, n_class + 1), dtype = quantize_type)
     # 数据到 center 的距离 
     dis_to_center = np.zeros((n_data), dtype = np.float32)
     for k in range(n_data):
+        if k % 100 == 0:
+          print("processing data: ", k)
         tmp_distance_table = np.zeros((n_subvector, n_class), dtype = float)
+        
+        if pca_mean is not None and pca_principal is not None:
+            # PCA 处理
+            norm_data = data[k] - pca_mean
+            data[k] = np.dot(norm_data, pca_principal)
         
         data_min = np.inf
         data_max = 0
         for i in range(n_subvector):
-            subvector = data[k][i * n_subvector_dim : (i + 1) * n_subvector_dim]
-            subvector_codebook = codebook[:, i * n_subvector_dim : (i + 1) * n_subvector_dim]
+            subvector = data[k][pre_lengths[i] : pre_lengths[i] + subvector_len[i]]
+            subvector_codebook = codebook[:, pre_lengths[i] : pre_lengths[i] + subvector_len[i]]
             max_dis = 0
             
             best_class = 0
@@ -1139,7 +1160,7 @@ def encode_pq(data: np.ndarray, codebook: np.ndarray, n_subvector: int, quantize
             quantized_min = data_min
             quantized_max = data_max
             
-        print(f"quantized_min: {quantized_min}, quantized_max: {quantized_max}")
+        # print(f"quantized_min: {quantized_min}, quantized_max: {quantized_max}")
         
         for i in range(n_subvector):
             for j in range(n_class):
@@ -1168,8 +1189,8 @@ def pq_dis(query_data, base_data):
     n_base = base_data.shape[0]
     
     ret = np.zeros((n_query, n_base), dtype = np.float32)
-    for m in range(n_base):
-        for n in range(n_query):
+    for n in range(n_query):
+        for m in range(n_base):
             res = 0
             for i in range(n_subvector):
                 best_index = round(base_data[m][i][-1])
@@ -1217,35 +1238,148 @@ def get_data_by_flash_encode():
     print(f"cand: {cand}")
 
     return
+  
+def cal_inversion_degree():
+  
+  #  pca 128 256 -> 0.776
+  # data = [
+  #   1404.,1297.,1504.,1579.,1556.,1686.,1695.,1513.,1602.,1658.,1794.,1559.,1723.,1735.,1746.,1784.,1627.,1747.,1718.,1790.,1744.,1862.,1872.,1834.,1920.,1814.,1832.,1870.,1874.,1893.,1831.,1874.,1832.,1922.,1746.,1878.,1978.,1909.,1760.,1706.,1879.,1857.,1882.,1822.,1949.,1863.,1877.,1924.,1856.,1987.,1975.,1912.,2010.,1957.,1919.,1877.,1976.,1982.,2077.,1788.,1943.,1951.,2112.,1835.,1953.,1966.,1993.,1997.,1985.,1972.,2068.,2006.,1839.,1967.,1817.,2098.,1785.,1869.,1773.,2022.,1919.,1869.,1877.,1937.,2013.,2200.,2015.,1998.,2008.,1861.,1964.,2027.,1918.,1991.,1894.,1976.,2005.,2099.,1891.,1886.
+  # ] 
+  # pca 128 512  -> 0.783
+#   data = [
+# 1407.,1315.,1522.,1593.,1553.,1711.,1712.,1544.,1637.,1665.,1809.,1563.,1738.,1750.,1768.,1803.,1650.,1771.,1742.,1788.,1771.,1876.,1871.,1843.,1940.,1829.,1853.,1880.,1902.,1892.,1851.,1890.,1851.,1932.,1771.,1875.,1980.,1910.,1777.,1731.,1889.,1848.,1884.,1838.,1973.,1879.,1884.,1943.,1862.,1996.,2006.,1920.,2034.,1963.,1953.,1870.,1981.,2001.,2090.,1814.,1959.,1951.,2123.,1869.,1965.,1965.,1996.,2025.,2004.,1974.,2074.,1998.,1847.,1981.,1843.,2101.,1794.,1884.,1799.,2016.,1959.,1902.,1906.,1954.,2009.,2221.,2007.,2017.,2040.,1887.,1966.,2033.,1932.,2014.,1906.,1989.,2014.,2120.,1917.,1914.
+#   ]
+  
+  # pca 64_512 -> 0.845
+  # data= [1525.,1507.,1622.,1763.,1830.,1743.,1844.,1860.,1877.,1940.,2022.,2030.,1933.,1972.,1974.,1946.,1982.,1948.,2055.,2081.,2027.,2060.,2137.,2106.,2068.,2116.,2113.,2146.,2080.,2030.,2131.,2092.,2109.,2126.,2146.,2153.,2164.,2178.,2145.,2191.,2147.,2084.,2162.,2111.,2189.,2109.,2176.,2157.,2199.,2181.,2197.,2201.,2188.,2178.,2191.,2155.,2200.,2210.,2243.,2099.,2167.,2189.,2245.,2179.,2230.,2216.,2322.,2212.,2275.,2259.,2193.,2243.,2129.,2203.,2155.,2305.,2126.,2171.,2133.,2328.,2234.,2165.,2265.,2200.,2202.,2278.,2229.,2227.,2184.,2215.,2285.,2253.,2120.,2220.,2157.,2212.,2278.,2315.,2266.,2287.]
+  
+  # pca 64_256   -> 0.843
+  # data = [
+  #     1449.,1482.,1640.,1726.,1794.,1754.,1840.,1876.,1894.,1946.,1968.,1920.,1960.,1991.,1947.,2028.,2037.,1942.,2044.,1994.,2033.,2001.,2085.,2058.,2109.,2107.,2058.,2141.,2081.,2012.,2161.,2088.,2134.,2069.,2052.,2080.,2099.,2182.,2104.,2153.,2167.,2173.,2168.,2158.,2152.,2148.,2135.,2138.,2176.,2159.,2201.,2163.,2188.,2187.,2165.,2126.,2214.,2231.,2262.,2221.,2189.,2216.,2230.,2162.,2201.,2234.,2218.,2193.,2196.,2188.,2183.,2284.,2128.,2171.,2222.,2260.,2068.,2223.,2074.,2225.,2201.,2110.,2250.,2189.,2279.,2266.,2217.,2216.,2183.,2182.,2290.,2280.,2182.,2237.,2204.,2211.,2189.,2219.,2290.,2185.
+  
+  # pca 64_256_float -> 0.845
+  data = [
+    1412.,1479.,1576.,1702.,1757.,1712.,1833.,1828.,1786.,1843.,1985.,1895.,1962.,1914.,1939.,1912.,1938.,1964.,1964.,1929.,2003.,1944.,2028.,2027.,2096.,2046.,1974.,2065.,2022.,2022.,2049.,1961.,2064.,2073.,2048.,2053.,2090.,2086.,2041.,2117.,2121.,2096.,2082.,2087.,2118.,2140.,2089.,2172.,2168.,2134.,2112.,2071.,2131.,2087.,2168.,2083.,2103.,2165.,2171.,2087.,2156.,2142.,2134.,2094.,2138.,2201.,2186.,2178.,2200.,2160.,2182.,2272.,2015.,2168.,2137.,2194.,2113.,2171.,2008.,2223.,2139.,2085.,2144.,2180.,2173.,2210.,2165.,2139.,2161.,2143.,2209.,2223.,2216.,2288.,2141.,2178.,2122.,2147.,2169.,2160.
+  ] 
+  
+  # ]
+  # pca 32 256 -> 0.673
+  #   data = [
+  # 2957.,2848.,2927.,2955.,2838.,3313.,3248.,3007.,3217.,3714.,3422.,3023.,3388.,3561.,3675.,3401.,3209.,3154.,3550.,3317.,3524.,4058.,3378.,3758.,3497.,3835.,3696.,3599.,3357.,3490.,3281.,3283.,3373.,3798.,3728.,3898.,3984.,3535.,3821.,3546.,3324.,3612.,3525.,3776.,3888.,3751.,4047.,3952.,3544.,4045.,3707.,3807.,4027.,4056.,4007.,3344.,3676.,3577.,3893.,3917.,3365.,3364.,3779.,3519.,4378.,4158.,3493.,3388.,3791.,4024.,4030.,3605.,3823.,3510.,4404.,3667.,3466.,3401.,3540.,4180.,4070.,3187.,3970.,3720.,3586.,4288.,3932.,3957.,3811.,3392.,3438.,4108.,4256.,3731.,3414.,3631.,3636.,4324.,3842.,3375.
+  #   ]
+  # nopca 32 256 -> 0.649
+  # data = [
+  # 13122.,13229.,13026.,13237.,13153.,13464.,12396.,13680.,12518.,13407.,12252.,12422.,13275.,12871.,13491.,12797.,12529.,14110.,12523.,13406.,13447.,13120.,12780.,13579.,13468.,12585.,13424.,12872.,13964.,13696.,13469.,12970.,12911.,12717.,13012.,13895.,13463.,12734.,13492.,14303.,12582.,13037.,13270.,13757.,13045.,13132.,12776.,12850.,14241.,13767.,12996.,13420.,13639.,13733.,13566.,13153.,13973.,14954.,14327.,12995.,13640.,13586.,13972.,13067.,13122.,13026.,13840.,13057.,13717.,13963.,14038.,13914.,14209.,13639.,13140.,13829.,14496.,14148.,13205.,13845.,13201.,13938.,14212.,13075.,13912.,13673.,13158.,12908.,13993.,14240.,13295.,13916.,14021.,12891.,13079.,13207.,13933.,14083.,13246.,13836.
+  # ] 
+  
+  size =len(data)
+  def merge_sort(arr):
+        if len(arr) <= 1:
+            return arr, 0
+        mid = len(arr) // 2
+        left, inv_left = merge_sort(arr[:mid])
+        right, inv_right = merge_sort(arr[mid:])
+        merged, inv_split = merge(left, right)
+        return merged, inv_left + inv_right + inv_split
+
+  def merge(left, right):
+        merged = []
+        i = j = inv_count = 0
+        while i < len(left) and j < len(right):
+            if left[i] <= right[j]:
+                merged.append(left[i])
+                i += 1
+            else:
+                merged.append(right[j])
+                inv_count += len(left) - i  # 这里发生逆序
+                j += 1
+        merged.extend(left[i:])
+        merged.extend(right[j:])
+        return merged, inv_count
+
+  _, count = merge_sort(data)
+  
+  score = 1 - (count / (size * (size - 1) / 2.0))
+  print(f"Total inversion count: {score}")
+  return
     
-def compute_pq_dis():
-    codebook_path = "/home/web_server/cc/project/ANN-Data/data/statistics/codebooks/streamAnnRecallV13_1000w/codebooks_flash_INT16_512_32_32_256_64_0_0_1.txt"
-    base_data_path = "/home/web_server/cc/project/ANN-Data/data/streamAnnRecallV13_1000w/streamAnnRecallV13_1000w_base.fvecs"
-    query_data_path = "/home/web_server/cc/project/ANN-Data/data/streamAnnRecallV13_1000w/streamAnnRecallV13_1000w_query.fvecs"
+def analyze_pq_space():
+    base_data_path = "/home/chencheng12/project/ann_data/data/codebooks/sift1m/index_flash_400_32_INT16_64_512_PCA_128.flash.ivecs"    
     
     dim = 128
-    n_subvector = 32
+    n_subvector = 64
     n_class = 256
     quantize_type = np.uint16
     #quantize_type = np.float32
     
+    def get_encode_hash(encode: np.ndarray) -> str:
+      # print(f"encode: {encode}")
+      str_encode = ""
+      for i in range(encode.shape[0]):
+        str_encode += str(encode[i]) + "-"
+      return str_encode
+    
+    base_data = read_ivecs(base_data_path)
+    
+    hash_dic = {}
+    count = 0
+    for i in range(len(base_data)):
+        if i % 100000 == 0:
+            print(f"processing base data {i} ...")
+        pq_base_data = base_data[i]
+        # print(f"pq_base_data: {pq_base_data}")
+        hashcode = get_encode_hash(pq_base_data)
+        
+        if hashcode not in hash_dic:
+          hash_dic[hashcode] = 1
+        else :
+          hash_dic[hashcode] += 1
+          
+    stat_dic = {}
+    for k, val in hash_dic.items():
+      if val not in stat_dic:
+        stat_dic[val] = 1
+      else:
+        stat_dic[val] += 1
+
+    print(f"stat_dic: {stat_dic}")
+    return
+
+def compute_pq_dis():
+    codebook_path = "/home/chencheng12/project/ann_data/data/codebooks/sift1m/codebooks_flash_400_32_INT16_64_512_PCA_128.txt"
+    base_data_path = "/home/chencheng12/project/ann_data/data/sift1m/sift1m_base.fvecs"
+    query_data_path = "/home/chencheng12/project/ann_data/data/sift1m/sift1m_query.fvecs"
+    
     enable_pca = False
-    pca_principal_dim = 0
+    if "_PCA_" in codebook_path:
+        enable_pca = True
+        print("enable pca")
+    
+    dim = 128
+    n_subvector = 64
+    n_class = 256
+    quantize_type = np.uint16
+    #quantize_type = np.float32
+    
+
+    pca_principal_dim = dim
     
     query_index = [0]
     #base_index = [828963, 3049115, 3357286, 9904061, 7420272, 2155121]
-    base_index = [9282379, 374596, 3527698, 8739369,4990539,6871643]
+    base_index = [828963]
     
     base_data = read_fvecs(base_data_path)[base_index]
     query_data = read_fvecs(query_data_path)[query_index]
     
-    q_min, q_max, codebook, pca_mean, pca_principal = read_pq_codebook(codebook_path, dim, n_subvector, n_class, enable_pca, pca_principal_dim)
-    pq_base_data, base2c_dis = encode_pq(base_data, codebook, n_subvector, quantize_type, q_min, q_max, False)
-    pq_query_data, query2c_dis = encode_pq(query_data, codebook, n_subvector, quantize_type, q_min, q_max, True)
+    q_min, q_max, codebook, pca_mean, pca_principal, pre_lengths = read_pq_codebook(codebook_path, dim, n_subvector, n_class, enable_pca, pca_principal_dim)
+    
+    pq_query_data, _ = encode_pq(query_data, codebook, pre_lengths, quantize_type, q_min, q_max, True, pca_mean, pca_principal)
+    pq_base_data, _ = encode_pq(base_data, codebook, pre_lengths, quantize_type, q_min, q_max, False, pca_mean, pca_principal)
+
     
     with np.printoptions(threshold=np.inf):
       #print(f"codebook: {codebook}")
-      #print(f"pq_base_data: {pq_base_data}" )
+      print(f"pq_base_data: {pq_base_data}" )
       #print(f"pq_base_data.shape: {pq_base_data.shape}")
       #print(f"pq_base_data, quant_data: {pq_base_data[:, :, 256:]}")
       pass
@@ -1253,15 +1387,12 @@ def compute_pq_dis():
     dis = pq_dis(pq_query_data, pq_base_data)
     # # dis = pq_dis(pq_base_data, pq_query_data)
     print(f"pq_dis: {dis}")
-    print(f"query_2_center_dis: {query2c_dis}")
-    print(f"base_2_center_dis: {base2c_dis}")
 
     l2_squared  = np.sum(query_data ** 2, axis=1, keepdims=True) + np.sum(base_data ** 2, axis=1) - 2 * np.dot(query_data, base_data.T)
     print(f"l2 dis: {l2_squared}")
 
-    l2_subvec_dis = get_subvector_dis(query_data, base_data, n_subvector)
-    print(f"l2 subvec dis: {l2_subvec_dis}")
-    
+    # l2_subvec_dis = get_subvector_dis(query_data, base_data, n_subvector)
+    # print(f"l2 subvec dis: {l2_subvec_dis}")    
     
 def compute_ip_dis():
     emb_a = np.array([0.459445, -0.784541, 0.332678, -0.227722, -0.607348, 0.393955, 0.205528, 0.197445, -0.904817, 0.153068, 0.246663, 0.274318, 0.0881884, 0.145625, -0.0334524, 0.382487, -0.286576, -1.18207, 0.377633, 0.165978, 0.806362, 0.835557, 0.564039, -0.0281437, -1.02787, 0.212187, -0.00910927, -0.195821, -0.136047, 0.963257, 0.476727, 0.250169, 1.08216, 0.23707, 0.249443, 0.562702, -0.2029, -0.545165, -0.89555, 0.426188, -0.125037, -0.186914, -0.752456, 0.103072, 0.116132, -0.20982, -0.423909, -0.809318, 0.511859, 0.29592, 0.544764, 0.116327, -0.661453, -0.107545, 0.18781, -1.22592, -0.379517, -0.468464, -0.0258397, 0.763438, 0.0275091, -0.193696, -0.164714, -0.729794, 0.412649, -0.67853, -0.150152, -0.0906334, -0.134262, 0.337062, -0.712863, 0.416704, -0.375496, -0.11359, 0.253077, -0.163563, 0.170667, 0.412346, 0.378557, -0.054914, -0.437873, 0.0959022, 0.312791, 0.440058, -0.15666, -0.147657, -0.0227138, 0.0661865, -0.561744, -0.459809, -0.784124, 0.493712, -1.09031, 0.181439, 0.0537629, -0.225572, -0.826041, -0.719915, 0.723571, -0.884072, 1.59089, -0.00823073, 0.0534151, 0.225651, 0.345826, 0.0948889, 0.0158797, -0.268326, -0.927716, 0.0952692, -0.11808, 0.107657, 0.684564, 0.174419, 0.28774, 0.754071, 0.0170375, -0.587092, 0.0851364, 0.320395, 0.11343, -0.264117, 0.153833, -0.838757, 0.135967, -0.253026, 0.842531, -0.227813], dtype = np.float32)
@@ -1298,7 +1429,7 @@ if __name__ == "__main__":
     #transfer_hnsw_to_fvecs()
     
     #split_dataset()
-    #generate_groundtruth()
+    # generate_groundtruth()
     # generate_groundtruth_with_direction()
     
     #read_fvecs("/mnt/test/cc/project/ANN-Data/data/bigcode/bigcode_base.fvecs", True)
@@ -1306,19 +1437,21 @@ if __name__ == "__main__":
     #read_vecs_at("/home/chencheng12/project/ann_data/data/sift_single/sift_single_query.fvecs", 0)
     #read_vecs_at("/home/web_server/cc/project/ANN-Data/data/streamAnnRecallV13_1000w/streamAnnRecallV13_1000w.flash.ivecs", 3357286)
     #read_vecs_at("/home/web_server/cc/project/ANN-Data/data/streamAnnRecallV13_1000w/streamAnnRecallV13_1000w.fvecs", 3357286)
-    read_vecs_at("/home/chencheng12/project/ann_data/data/sift1m/sift1m_groundtruth.ivecs", 0)
+    # read_vecs_at("/home/chencheng12/project/ann_data/data/sift1m/sift1m_groundtruth.ivecs", 0)
 
     #analyze_query_2_data_dis()
 
     # compute_distance()
-    #compute_pq_dis()
+    # compute_pq_dis()
+    analyze_pq_space()
+    # cal_inversion_degree()
     #analyze_flash_neighbors()
     #analyze_hnsw_neighbors()
-    #transfer_flash_to_ivecs()
+    # transfer_flash_to_ivecs()
     #get_hnsw_v2_linkdata()
     
     #pca_dim_analyze("/mnt/test/cc/project/ANN-Data/data//sift1m_base.fvecs", 200000, 0.90)
-    #compare_recall()
+    # compare_recall()
     #get_data_by_flash_encode()
     
     # read_pq_codebook("/home/chencheng12/project/ann_data/data/codebooks/sift/codebooks_flash_INT8_512_32_16_256_64_0_1_0.txt", 128, 16, 256)
