@@ -1333,7 +1333,6 @@ def cal_inversion_degree():
             2047.0, 2041.0, 2055.0, 2053.0, 2056.0, 2056.0, 2049.0, 2067.0, 2070.0, 2076.0, 2074.0, 2064.0, 2068.0, 2074.0, 2076.0, 2071.0, 2074.0, 2067.0, 2059.0, 2079.0, 2076.0, 2080.0, 2077.0, 2078.0, 2079.0, 2084.0, 2094.0, 2082.0, 2084.0, 2093.0, 2089.0, 2088.0, 2095.0, 2088.0, 2089.0, 2096.0, 2095.0, 2112.0, 2102.0, 2104.0, 2100.0, 2107.0, 2114.0, 2110.0, 2108.0, 2118.0, 2106.0, 2118.0, 2113.0, 2121.0]
 
     size = len(data)
-
     def merge_sort(arr):
         if len(arr) <= 1:
             return arr, 0
@@ -1410,10 +1409,10 @@ def analyze_pq_space():
 
 def compute_pq_dis():
     # codebook_path = "/home/chencheng12/project/ann_data/data/codebooks/sift1m/codebooks_flash_400_32_INT16_32_16_NOPCA_128.txt"
-    codebook_path = "/home/chencheng12/project/ann_data/data/codebooks/sift1m/codebooks_flash_400_32_INT8_128_128_NOPCA_128.txt"
-    base_data_path = "/home/chencheng12/project/ann_data/data/sift1m/sift1m_base.fvecs"
-    query_data_path = "/home/chencheng12/project/ann_data/data/sift1m/sift1m_query.fvecs"
-
+    codebook_path = "/mnt/test/cc/project/ANN-Data/data/statistics/codebooks/sift1m/codebooks_flash-v4_400_32_32_256.txt"
+    base_data_path = "/mnt/test/cc/project/ANN-Data/data//sift1m/sift1m_base.fvecs"
+    query_data_path = "/mnt/test/cc/project/ANN-Data/data//sift1m/sift1m_query.fvecs"
+    
     enable_pca = False
     if "_PCA_" in codebook_path:
         enable_pca = True
@@ -1421,7 +1420,7 @@ def compute_pq_dis():
 
     dim = 128
     n_subvector = 128
-    n_class = 128
+    n_class = 64
     # quantize_type = np.uint8
     quantize_type = np.uint16
     # quantize_type = np.uint32
