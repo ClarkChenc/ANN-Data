@@ -1445,7 +1445,7 @@ if __name__ == "__main__":
     # compute_distance()
     # analyze_pq_space()
     # compute_pq_dis()
-    cal_inversion_degree()
+    # cal_inversion_degree()
     #analyze_flash_neighbors()
     #analyze_hnsw_neighbors()
     # transfer_flash_to_ivecs()
@@ -1457,7 +1457,7 @@ if __name__ == "__main__":
     
     # read_pq_codebook("/home/chencheng12/project/ann_data/data/codebooks/sift/codebooks_flash_INT8_512_32_16_256_64_0_1_0.txt", 128, 16, 256)
     # compute_ip_dis()
-    # random_emb(128)
+    random_emb(64)
     pass
   finally:
     from joblib.externals.loky import get_reusable_executor
