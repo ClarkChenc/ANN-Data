@@ -172,6 +172,24 @@ def huggingface_dataset_download() -> None:
                 cur_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
                 print(f"{cur_time}: Processed {doc_cnt} documents")
         print(f"download done")
+        
+        
+def generate_dataset():
+  root_path = "../data/"
+  data_dim = 128
+  data_num = 200
+  data_name = f"random_{data_dim}d_{data_num}w"
+  
+  data_num = data_num * 10000
+  data_path = os.path.join(root_path, data_name, data_name + ".fvecs")
+  pathlib.Path(os.path.dirname(data_path)).mkdir(parents=True, exist_ok=True)
+  
+  data = np.random.rand(data_num, data_dim).astype(np.float32)
+  # 对 data 做归一化处理
+  data = data / np.linalg.norm(data, axis=1, keepdims=True)
+  
+  write_fvecs(data_path, data)
+  print(f"generate dataset {data_name} done, data.shape: {data.shape}")
 
 def transfer_csv_to_fvecs() -> None:
   src_path = "/mnt/test/cc/project/ANN-Data/data/innerstreamv7_1000w/innerstreamv7_1000w.csv"
@@ -1423,8 +1441,9 @@ def random_emb(dim: int):
                
 if __name__ == "__main__":
   try:
-
     #huggingface_dataset_download()
+    generate_dataset()
+    
     #transfer_npy_to_fvecs()
     #transfer_csv_to_fvecs()
     #transfer_hnsw_to_fvecs()
@@ -1457,7 +1476,7 @@ if __name__ == "__main__":
     
     # read_pq_codebook("/home/chencheng12/project/ann_data/data/codebooks/sift/codebooks_flash_INT8_512_32_16_256_64_0_1_0.txt", 128, 16, 256)
     # compute_ip_dis()
-    random_emb(64)
+    # random_emb(64)
     pass
   finally:
     from joblib.externals.loky import get_reusable_executor
