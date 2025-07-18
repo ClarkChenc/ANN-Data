@@ -855,7 +855,7 @@ def compute_groundtruth_expatch_with_parallel(base_data, query_data, topk, batch
 
     return np.vstack(results)
 
-def compute_groundtruth_safe(base, query, topk=100, query_batch_size=100, base_batch_size=10000):
+def compute_groundtruth_safe(base, query, dis_type = "l2", topk=100, query_batch_size=100, base_batch_size=10000):
     nq = query.shape[0]
     nb = base.shape[0]
     dim = base.shape[1]
@@ -877,13 +877,17 @@ def compute_groundtruth_safe(base, query, topk=100, query_batch_size=100, base_b
         for b_start in range(0, nb, base_batch_size):
             b_end = min(b_start + base_batch_size, nb)
             b_batch = base[b_start:b_end]  # (Bb, dim)
-
+            
+            dists = 0
             # 距离计算 (L2 squared)
-            dists = (
-                np.sum(q_batch ** 2, axis=1, keepdims=True) +
-                np.sum(b_batch ** 2, axis=1) -
-                2 * np.dot(q_batch, b_batch.T)
-            )  # shape: (Bq, Bb)
+            if dis_type == "l2":
+              dists = (
+                  np.sum(q_batch ** 2, axis=1, keepdims=True) +
+                  np.sum(b_batch ** 2, axis=1) -
+                  2 * np.dot(q_batch, b_batch.T)
+              )  # shape: (Bq, Bb)
+            elif dis_type == "ip":
+              dists = -np.dot(q_batch, b_batch.T)
 
             # 合并现有结果
             combined_dists = np.concatenate([batch_dists, dists], axis=1)
@@ -990,6 +994,7 @@ def generate_groundtruth() -> None:
     data_name = "sift1m"
     # 计算 query 的 topk groundtruth
     topk = 100
+    dis_type = 'l2'
     
     use_pca = True
     pca_dim = 128
@@ -1014,7 +1019,7 @@ def generate_groundtruth() -> None:
         print("pca done")
     
     #groundtruth = compute_groundtruth_batch_with_parallel(base_data, query_data, topk, batch_size = 500, n_jobs = 1)
-    groundtruth = compute_groundtruth_safe(base_data, query_data, topk, query_batch_size=1000, base_batch_size = 1000000)
+    groundtruth = compute_groundtruth_safe(base_data, query_data, dis_type, topk, query_batch_size=1000, base_batch_size = 1000000)
     write_ivecs(groundtruth_path, groundtruth)
     
     print("groundtruth done")
