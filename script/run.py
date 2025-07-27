@@ -651,14 +651,17 @@ def transfer_flash_to_ivecs():
 
 
 def transfer_hnsw_to_fvecs():
-    src_path = "/mnt/test/cc/project/ANN-Data/data/streamAnnRecallV13/flanker.index"
-    dst_path = "/home/web_server/cc/project/ANN-Data/data/streamAnnRecallV13/streamAnnRecallV13.fvecs"
-    data_dim = 128
+  src_path ="/mnt/test/cc/project/ANN-Data/data/ReferAnnRecallV7.org/flanker.index"
+  dst_path ="/home/web_server/cc/project/ANN-Data/data/ReferAnnRecallV7.org/ReferAnnRecallV7.fvecs"
+  data_dim = 128
 
     embs = []
     with open(src_path, 'rb') as f:
         c = f.read(8)
         offset_level0 = struct.unpack('q', c)[0]
+
+        c = f.read(8) 
+        max_element = struct.unpack('q', c)[0]
 
         c = f.read(8)
         cur_element_count = struct.unpack('q', c)[0]
@@ -732,8 +735,8 @@ def transfer_npy_to_fvecs() -> None:
 def split_dataset(seed=42) -> None:
     # 将数据分割成 base / query 两个部分
     root_path = "../data/"
-    data_name = "streamAnnRecallV13_1000w"
-    n_query = 20000
+    data_name = "ReferAnnRecallV7_100w"
+    n_query = 20000 
 
     data_path = os.path.join(root_path, data_name, data_name + ".fvecs")
     base_path = os.path.join(root_path, data_name, data_name + "_base.fvecs")
@@ -1020,21 +1023,20 @@ def generate_groundtruth_with_direction() -> None:
 def generate_groundtruth() -> None:
     # 生成 groundtruth 文件
     root_path = "../data/"
-    # data_name = "streamAnnRecallV13_1000w"
-    data_name = "sift1m"
+    #data_name = "streamAnnRecallV13_1000w"
+    data_name = "ReferAnnRecallV7_100w"
     # 计算 query 的 topk groundtruth
-    topk = 100
-    dis_type = 'l2'
-
-    use_pca = True
+    topk = 200
+    dis_type = 'ip'
+    
+    use_pca = False
     pca_dim = 128
     sample_ratio = 0.1
 
     base_path = os.path.join(root_path, data_name, data_name + "_base.fvecs")
     query_path = os.path.join(root_path, data_name, data_name + "_query.fvecs")
-    groundtruth_path = os.path.join(
-        root_path, data_name, data_name + "_groundtruth.ivecs")
-
+    groundtruth_path = os.path.join(root_path, data_name, data_name + f"_groundtruth.ivecs.{dis_type}")
+    
     base_data = read_fvecs(base_path)
     query_data = read_fvecs(query_path)
     if use_pca:
@@ -1059,10 +1061,11 @@ def generate_groundtruth() -> None:
 
 
 def compare_recall() -> None:
-    base_groundtruth_path = "/home/chencheng12/project/ann_data/data/sift1m/sift1m_groundtruth.ivecs"
-    compare_groundtruth_path = "/home/chencheng12/project/ann_data/data/sift1m/sift1m_groundtruth_pca_128.ivecs"
-
-    groundtruth_a = read_ivecs(base_groundtruth_path)
+    root_path = "/home/web_server/cc/project/ANN-Data/data/"
+    base_groundtruth_path = root_path + "dup128d_200w/dup128d_200w_groundtruth_l2.ivecs"
+    compare_groundtruth_path = root_path + "dup128d_200w/dup128d_200w_groundtruth_ip.ivecs"
+    
+    groundtruth_a = read_ivecs(base_groundtruth_path) 
     groundtruth_b = read_ivecs(compare_groundtruth_path)
     dim_exp = groundtruth_a.shape[1]
 
