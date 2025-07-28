@@ -13,6 +13,9 @@ import time
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 from mpl_toolkits.mplot3d import Axes3D  # 引入3D支持
+import plotly.express as px
+import plotly.io as pio
+import pandas as pd
 
 from matplotlib.patches import Patch
 
@@ -122,48 +125,72 @@ def plot_data_with_umap():
     ground_truth_data = read_ivecs(ground_truth_path, True)[:query_n]
     labels = generate_labels_with_ground_truth(data, ground_truth_data)
 
-    # 映射颜色
-    unique_labels = np.unique(labels)
-    cluster_labels = unique_labels[unique_labels != -1]
-    n_clusters = len(cluster_labels)
+    # # 映射颜色
+    # unique_labels = np.unique(labels)
+    # cluster_labels = unique_labels[unique_labels != -1]
+    # n_clusters = len(cluster_labels)
 
-    cmap = cm.get_cmap('tab20', n_clusters)
-    colors = cmap(np.arange(n_clusters))
-    point_colors = np.full((len(labels), 4), fill_value=(
-        0.5, 0.5, 0.5, 0.1))  # RGBA 灰色半透明
+    # cmap = cm.get_cmap('tab20', n_clusters)
+    # colors = cmap(np.arange(n_clusters))
+    # point_colors = np.full((len(labels), 4), fill_value=(
+    #     0.5, 0.5, 0.5, 0.1))  # RGBA 灰色半透明
 
-    for idx, label in enumerate(cluster_labels):
-        point_colors[labels == label] = colors[idx]
+    # for idx, label in enumerate(cluster_labels):
+    #     point_colors[labels == label] = colors[idx]
 
-    t_start = time.time()
-    reducer = umap.UMAP(n_components=3, n_neighbors=200, min_dist=0.1,
-                        metric='cosine', random_state=42, n_jobs=10)
-    data_3d = reducer.fit_transform(data)
-    t_end = time.time()
-    print(f"cost: {t_end - t_start:.2f} s")
+    # t_start = time.time()
+    # reducer = umap.UMAP(n_components=3, n_neighbors=200, min_dist=0.1,
+    #                     metric='cosine', random_state=42, n_jobs=10)
+    # data_3d = reducer.fit_transform(data)
+    # t_end = time.time()
+    # print(f"cost: {t_end - t_start:.2f} s")
 
-    fig = plt.figure(figsize=(10, 10))
-    ax = fig.add_subplot(111, projection='3d')
+    # fig = plt.figure(figsize=(10, 10))
+    # ax = fig.add_subplot(111, projection='3d')
 
-    scatter = ax.scatter(data_3d[:, 0], data_3d[:, 1], data_3d[:, 2], s=1,
-                         c=point_colors)
-    plt.title(f'UMAP Visualization of {data_name}')
-    plt.grid(True)
+    # scatter = ax.scatter(data_3d[:, 0], data_3d[:, 1], data_3d[:, 2], s=1,
+    #                      c=point_colors)
+    # plt.title(f'UMAP Visualization of {data_name}')
+    # plt.grid(True)
 
-    # 显示图例
-    legend_elements = [
-        Patch(facecolor=(0.6, 0.6, 0.6, 0.4), edgecolor='none', label='-1 (Unlabeled)')]
+    # # 显示图例
+    # legend_elements = [
+    #     Patch(facecolor=(0.6, 0.6, 0.6, 0.4), edgecolor='none', label='-1 (Unlabeled)')]
 
-    for idx, label in enumerate(cluster_labels):
-        color = colors[idx]
-        legend_elements.append(
-            Patch(facecolor=color, edgecolor='none', label=f'Label {label}'))
+    # for idx, label in enumerate(cluster_labels):
+    #     color = colors[idx]
+    #     legend_elements.append(
+    #         Patch(facecolor=color, edgecolor='none', label=f'Label {label}'))
 
-    plt.legend(handles=legend_elements, title='Labels',
-               bbox_to_anchor=(1.05, 1), loc='upper left')
+    # plt.legend(handles=legend_elements, title='Labels',
+    #            bbox_to_anchor=(1.05, 1), loc='upper left')
 
-    plt.tight_layout()
+    # plt.tight_layout()
     # plt.savefig(f'../output/{data_name}_umap.png', dpi=300)
+
+    # 🧾 构造 DataFrame
+    df = pd.DataFrame(data_3d, columns=["x", "y", "z"])
+    df["label"] = labels
+    df["label_str"] = df["label"].astype(str)
+    df.loc[df["label"] == -1, "label_str"] = "Unlabeled"
+
+    # 🎨 绘图
+    fig = px.scatter_3d(
+        df,
+        x="x", y="y", z="z",
+        color="label_str",
+        color_discrete_sequence=px.colors.qualitative.Set3 + ["#999999"],
+        title=f"UMAP 3D Visualization of {data_name}",
+        opacity=0.7
+    )
+    fig.update_traces(marker=dict(size=2))
+    fig.update_layout(legend_title_text='Labels')
+
+    # 💾 保存为 HTML
+    output_path = f"../output/{data_name}_umap_3d.html"
+    fig.write_html(output_path)
+    print(f"Saved interactive 3D plot to: {output_path}")
+
     fig.write_html(f'../output/{data_name}_umap.html')
 
     return
