@@ -163,7 +163,8 @@ def plot_data_with_umap():
                bbox_to_anchor=(1.05, 1), loc='upper left')
 
     plt.tight_layout()
-    plt.savefig(f'../output/{data_name}_umap.png', dpi=300)
+    # plt.savefig(f'../output/{data_name}_umap.png', dpi=300)
+    fig.write_html(f'../output/{data_name}_umap.html')
 
     return
 
