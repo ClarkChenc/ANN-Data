@@ -137,12 +137,12 @@ def plot_data_with_umap():
     t_start = time.time()
     reducer = umap.UMAP(n_components=3, n_neighbors=200, min_dist=0.1,
                         metric='cosine', random_state=42, n_jobs=10)
-    data_2d = reducer.fit_transform(data)
+    data_3d = reducer.fit_transform(data)
     t_end = time.time()
     print(f"cost: {t_end - t_start:.2f} s")
 
     plt.figure(figsize=(10, 10))
-    scatter = plt.scatter(data_2d[:, 0], data_2d[:, 1], s=1,
+    scatter = plt.scatter(data_3d[:, 0], data_3d[:, 1], data_3d[:, 2], s=1,
                           c=point_colors)
     plt.title(f'UMAP Visualization of {data_name}')
     plt.grid(True)
