@@ -134,7 +134,7 @@ def plot_data_with_umap():
 
     t_start = time.time()
     reducer = umap.UMAP(n_neighbors=64, min_dist=0.1,
-                        metric='cosine', random_state=42)
+                        metric='cosine', random_state=42, n_jobs = 10)
     data_2d = reducer.fit_transform(data)
     t_end = time.time()
     print(f"cost: {t_end - t_start:.2f} s")

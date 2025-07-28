@@ -651,11 +651,10 @@ def transfer_flash_to_ivecs():
 
 
 def transfer_hnsw_to_fvecs():
-  src_path ="/mnt/test/cc/project/ANN-Data/data/ReferAnnRecallV7.org/flanker.index"
-  dst_path ="/home/web_server/cc/project/ANN-Data/data/ReferAnnRecallV7.org/ReferAnnRecallV7.fvecs"
-  data_dim = 128
+    src_path ="/mnt/test/cc/project/ANN-Data/data/ReferAnnRecallV7.org/flanker.index"
+    dst_path ="/home/web_server/cc/project/ANN-Data/data/ReferAnnRecallV7.org/ReferAnnRecallV7.fvecs"
+    data_dim = 128
 
-    embs = []
     with open(src_path, 'rb') as f:
         c = f.read(8)
         offset_level0 = struct.unpack('q', c)[0]
@@ -1024,7 +1023,7 @@ def generate_groundtruth() -> None:
     # 生成 groundtruth 文件
     root_path = "../data/"
     #data_name = "streamAnnRecallV13_1000w"
-    data_name = "ReferAnnRecallV7_100w"
+    data_name = "ReferAnnRecallV7_10w"
     # 计算 query 的 topk groundtruth
     topk = 200
     dis_type = 'ip'
@@ -1510,7 +1509,7 @@ if __name__ == "__main__":
         # transfer_hnsw_to_fvecs()
 
         # split_dataset()
-        # generate_groundtruth()
+        generate_groundtruth()
         # generate_groundtruth_with_direction()
 
         # read_fvecs("/mnt/test/cc/project/ANN-Data/data/bigcode/bigcode_base.fvecs", True)
@@ -1537,7 +1536,7 @@ if __name__ == "__main__":
 
         # read_pq_codebook("/home/chencheng12/project/ann_data/data/codebooks/sift/codebooks_flash_INT8_512_32_16_256_64_0_1_0.txt", 128, 16, 256)
         # compute_ip_dis()
-        random_emb(128)
+        #random_emb(128)
         pass
     finally:
         from joblib.externals.loky import get_reusable_executor
