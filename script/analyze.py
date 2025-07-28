@@ -12,6 +12,19 @@ import umap.umap_ as umap
 import time
 
 
+def generate_labels_with_ground_truth(data, ground_truth_data):
+    n_base = data.shape[0]
+    n_query = ground_truth_data.shape[0]
+
+    labels = -1 * np.ones(n_base, dtype=np.int32)
+    for qid in range(n_query):
+        for idx in ground_truth_data[qid]:
+            if labels[idx] == -1:
+                labels[idx] = qid
+
+    return labels
+
+
 def print_hnsw_outdegree_distribute():
     row_points = [
         # streamV13
@@ -94,11 +107,17 @@ def plot_data_with_tsne():
 def plot_data_with_umap():
     root_path = "/home/web_server/cc/project/ANN-Data/data"
     data_name = "dup128d_200w"
+    query_n = 10
 
     data_path = os.path.join(root_path, data_name, data_name + "_base.fvecs")
-    data = read_fvecs(data_path, True)
+    ground_truth_path = os.path.join(
+        root_path, data_name, data_name + "_groundtruth.ivecs")
 
-    t_start = time.time() 
+    data = read_fvecs(data_path, True)
+    ground_truth_data = read_ivecs(ground_truth_path, True)[:query_n]
+    labels = generate_labels_with_ground_truth(data, ground_truth_data)
+
+    t_start = time.time()
     reducer = umap.UMAP(n_neighbors=64, min_dist=0.1,
                         metric='cosine', random_state=42)
     data_2d = reducer.fit_transform(data)
@@ -106,7 +125,8 @@ def plot_data_with_umap():
     print(f"cost: {t_end - t_start:.2f} s")
 
     plt.figure(figsize=(10, 10))
-    scatter = plt.scatter(data_2d[:, 0], data_2d[:, 1], s=1, alpha=0.2)
+    scatter = plt.scatter(data_2d[:, 0], data_2d[:, 1], s=1,
+                          alpha=0.2, c=labels, cmap='Spectral')
     plt.title(f'UMAP Visualization of {data_name}')
     plt.colorbar(scatter)
     plt.grid(True)
@@ -123,5 +143,6 @@ if __name__ == '__main__':
     # get_shard_num()
     # plot_hist()
     # plot_data_with_tsne()
-    plot_data_with_umap()
+    # plot_data_with_umap()
+
     pass

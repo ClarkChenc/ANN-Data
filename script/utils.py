@@ -17,6 +17,21 @@ def read_fvecs(file_name: str, show_shape: bool = False) -> np.ndarray:
     return data[:, 1:]
 
 
+def read_ivecs(file_name: str, show_shape: bool = False) -> np.ndarray:
+    print("begin to read ivecs: ", file_name)
+    with open(file_name, 'rb') as f:
+        data = np.fromfile(f, dtype=np.int32)
+
+    dim = struct.unpack('i', data[0])[0]
+    data = data.reshape(-1, dim + 1)
+
+    if show_shape:
+        print(f"data.shape: {data.shape}, dim: {dim}")
+
+    # 仅使用 emb 部分
+    return data[:, 1:]
+
+
 def generate_normal_random(size, min, max, mean=0.5, std_dev=1):
 
     samples = []
