@@ -125,6 +125,13 @@ def plot_data_with_umap():
     ground_truth_data = read_ivecs(ground_truth_path, True)[:query_n]
     labels = generate_labels_with_ground_truth(data, ground_truth_data)
 
+    t_start = time.time()
+    reducer = umap.UMAP(n_components=3, n_neighbors=200, min_dist=0.1,
+                        metric='cosine', random_state=42, n_jobs=10)
+    data_3d = reducer.fit_transform(data)
+    t_end = time.time()
+    print(f"cost: {t_end - t_start:.2f} s")
+
     # # 映射颜色
     # unique_labels = np.unique(labels)
     # cluster_labels = unique_labels[unique_labels != -1]
@@ -137,13 +144,6 @@ def plot_data_with_umap():
 
     # for idx, label in enumerate(cluster_labels):
     #     point_colors[labels == label] = colors[idx]
-
-    # t_start = time.time()
-    # reducer = umap.UMAP(n_components=3, n_neighbors=200, min_dist=0.1,
-    #                     metric='cosine', random_state=42, n_jobs=10)
-    # data_3d = reducer.fit_transform(data)
-    # t_end = time.time()
-    # print(f"cost: {t_end - t_start:.2f} s")
 
     # fig = plt.figure(figsize=(10, 10))
     # ax = fig.add_subplot(111, projection='3d')
