@@ -12,6 +12,7 @@ import umap.umap_ as umap
 import time
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
+from mpl_toolkits.mplot3d import Axes3D  # 引入3D支持
 
 from matplotlib.patches import Patch
 
@@ -141,9 +142,11 @@ def plot_data_with_umap():
     t_end = time.time()
     print(f"cost: {t_end - t_start:.2f} s")
 
-    plt.figure(figsize=(10, 10))
-    scatter = plt.scatter(data_3d[:, 0], data_3d[:, 1], data_3d[:, 2], s=1,
-                          c=point_colors)
+    fig = plt.figure(figsize=(10, 10))
+    ax = fig.add_subplot(111, projection='3d')
+
+    scatter = ax.scatter(data_3d[:, 0], data_3d[:, 1], data_3d[:, 2], s=1,
+                         c=point_colors)
     plt.title(f'UMAP Visualization of {data_name}')
     plt.grid(True)
 
