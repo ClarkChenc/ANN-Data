@@ -10,6 +10,8 @@ import struct
 from sklearn.manifold import TSNE
 import umap.umap_ as umap
 import time
+import matplotlib.cm as cm
+import matplotlib.colors as mcolors
 
 
 def generate_labels_with_ground_truth(data, ground_truth_data):
@@ -106,7 +108,7 @@ def plot_data_with_tsne():
 
 def plot_data_with_umap():
     root_path = "/home/web_server/cc/project/ANN-Data/data"
-    data_name = "dup128d_200w"
+    data_name = "ReferAnnRecallV7_10w"
     query_n = 10
 
     data_path = os.path.join(root_path, data_name, data_name + "_base.fvecs")
@@ -156,6 +158,6 @@ if __name__ == '__main__':
     # get_shard_num()
     # plot_hist()
     # plot_data_with_tsne()
-    # plot_data_with_umap()
+    plot_data_with_umap()
 
     pass
