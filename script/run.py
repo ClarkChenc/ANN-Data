@@ -77,6 +77,7 @@ def read_vecs_at(file_path: str, index: int) -> None:
     print(f"Reading {file_path}")
     file = Path(file_path)
     ext = file.suffix
+    data = []
 
     value_type = np.float32
     if ext == ".fvecs":
@@ -112,7 +113,7 @@ def read_vecs_at(file_path: str, index: int) -> None:
 def read_fvecs_at_and_save(file_path: str, index: int):
     target_save_path = f"{file_path}.fvecs.{index}"
 
-    data = read_vecs_at(file_path, index)
+    data = [read_vecs_at(file_path, index)]
     write_fvecs(target_save_path, data)
 
     return
@@ -1196,10 +1197,8 @@ def encode_pq(data: np.ndarray, codebook: np.ndarray, pre_lengths: np.ndarray, q
         data_min = np.inf
         data_max = 0
         for i in range(n_subvector):
-            subvector = data[k][pre_lengths[i]
-                : pre_lengths[i] + subvector_len[i]]
-            subvector_codebook = codebook[:, pre_lengths[i]
-                : pre_lengths[i] + subvector_len[i]]
+            subvector = data[k][pre_lengths[i]                                : pre_lengths[i] + subvector_len[i]]
+            subvector_codebook = codebook[:, pre_lengths[i]                                          : pre_lengths[i] + subvector_len[i]]
             max_dis = 0
 
             best_class = 0
