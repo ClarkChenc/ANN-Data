@@ -181,9 +181,9 @@ def plot_data_with_umap():
         color="label_str",
         color_discrete_sequence=px.colors.qualitative.Set3 + ["#999999"],
         title=f"UMAP 3D Visualization of {data_name}",
-        opacity=0.7
+        opacity=0.4
     )
-    fig.update_traces(marker=dict(size=2))
+    fig.update_traces(marker=dict(size=1))
     fig.update_layout(legend_title_text='Labels')
 
     # 💾 保存为 HTML
