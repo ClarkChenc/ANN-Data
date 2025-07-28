@@ -127,7 +127,7 @@ def plot_data_with_umap():
     cmap = cm.get_cmap('tab20', n_clusters)
     colors = cmap(np.arange(n_clusters))
     point_colors = np.full((len(labels), 4), fill_value=(
-        0.6, 0.6, 0.6, 0.5))  # RGBA 灰色半透明
+        0.6, 0.6, 0.6, 0.1))  # RGBA 灰色半透明
 
     for idx, label in enumerate(cluster_labels):
         point_colors[labels == label] = colors[idx]
@@ -141,7 +141,7 @@ def plot_data_with_umap():
 
     plt.figure(figsize=(10, 10))
     scatter = plt.scatter(data_2d[:, 0], data_2d[:, 1], s=1,
-                          alpha=0.2, c=point_colors, cmap='Spectral')
+                          c=point_colors)
     plt.title(f'UMAP Visualization of {data_name}')
     plt.colorbar(scatter)
     plt.grid(True)
