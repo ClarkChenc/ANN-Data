@@ -13,6 +13,8 @@ import time
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 
+from matplotlib.patches import Patch
+
 
 def generate_labels_with_ground_truth(data, ground_truth_data):
     n_base = data.shape[0]
@@ -143,8 +145,20 @@ def plot_data_with_umap():
     scatter = plt.scatter(data_2d[:, 0], data_2d[:, 1], s=1,
                           c=point_colors)
     plt.title(f'UMAP Visualization of {data_name}')
-    plt.colorbar(scatter)
     plt.grid(True)
+
+    # 显示图例
+    legend_elements = [
+        Patch(facecolor=(0.6, 0.6, 0.6, 0.4), edgecolor='none', label='-1 (Unlabeled)')]
+
+    for idx, label in enumerate(cluster_labels):
+        color = colors[idx]
+        legend_elements.append(
+            Patch(facecolor=color, edgecolor='none', label=f'Label {label}'))
+
+    plt.legend(handles=legend_elements, title='Labels',
+               bbox_to_anchor=(1.05, 1), loc='upper left')
+
     plt.tight_layout()
     plt.savefig(f'../output/{data_name}_umap.png', dpi=300)
 
