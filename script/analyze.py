@@ -8,7 +8,8 @@ import utils
 import cityhash
 import struct
 from sklearn.manifold import TSNE
-import umap
+import umap.umap_ as umap
+import time
 
 
 def print_hnsw_outdegree_distribute():
@@ -90,19 +91,22 @@ def plot_data_with_tsne():
     return
 
 
-def print_data_with_umap():
-    root_path = ""
-    data_name = ""
+def plot_data_with_umap():
+    root_path = "/home/web_server/cc/project/ANN-Data/data"
+    data_name = "dup128d_200w"
 
     data_path = os.path.join(root_path, data_name, data_name + "_base.fvecs")
     data = read_fvecs(data_path, True)
 
+    t_start = time.time() 
     reducer = umap.UMAP(n_neighbors=64, min_dist=0.1,
                         metric='cosine', random_state=42)
     data_2d = reducer.fit_transform(data)
+    t_end = time.time()
+    print(f"cost: {t_end - t_start:.2f} s")
 
     plt.figure(figsize=(10, 10))
-    scatter = plt.scatter(data_2d[:, 0], data_2d[:, 1], s=1, alpha=0.5)
+    scatter = plt.scatter(data_2d[:, 0], data_2d[:, 1], s=1, alpha=0.2)
     plt.title(f'UMAP Visualization of {data_name}')
     plt.colorbar(scatter)
     plt.grid(True)
@@ -119,4 +123,5 @@ if __name__ == '__main__':
     # get_shard_num()
     # plot_hist()
     # plot_data_with_tsne()
+    plot_data_with_umap()
     pass

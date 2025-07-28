@@ -1,4 +1,5 @@
 import numpy as np
+import struct
 
 
 def read_fvecs(file_name: str, show_shape: bool = False) -> np.ndarray:
