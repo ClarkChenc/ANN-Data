@@ -109,6 +109,15 @@ def read_vecs_at(file_path: str, index: int) -> None:
     return vec
 
 
+def read_fvecs_at_and_save(file_path: str, index: int):
+    target_save_path = f"{file_path}.fvecs.{index}"
+
+    data = read_vecs_at(file_path, index)
+    write_fvecs(target_save_path, data)
+
+    return
+
+
 def pca_dim_expasenalyze(file_name, data_num, target_var=0.9):
     # PCA 降维
     data = read_fvecs(file_name)
@@ -651,15 +660,16 @@ def transfer_flash_to_ivecs():
 
 
 def transfer_hnsw_to_fvecs():
-    src_path ="/mnt/test/cc/project/ANN-Data/data/ReferAnnRecallV7.org/flanker.index"
-    dst_path ="/home/web_server/cc/project/ANN-Data/data/ReferAnnRecallV7.org/ReferAnnRecallV7.fvecs"
+    src_path = "/mnt/test/cc/project/ANN-Data/data/ReferAnnRecallV7.org/flanker.index"
+    dst_path = "/home/web_server/cc/project/ANN-Data/data/ReferAnnRecallV7.org/ReferAnnRecallV7.fvecs"
     data_dim = 128
 
+    embs = []
     with open(src_path, 'rb') as f:
         c = f.read(8)
         offset_level0 = struct.unpack('q', c)[0]
 
-        c = f.read(8) 
+        c = f.read(8)
         max_element = struct.unpack('q', c)[0]
 
         c = f.read(8)
@@ -735,7 +745,7 @@ def split_dataset(seed=42) -> None:
     # 将数据分割成 base / query 两个部分
     root_path = "../data/"
     data_name = "ReferAnnRecallV7_100w"
-    n_query = 20000 
+    n_query = 20000
 
     data_path = os.path.join(root_path, data_name, data_name + ".fvecs")
     base_path = os.path.join(root_path, data_name, data_name + "_base.fvecs")
@@ -1022,20 +1032,22 @@ def generate_groundtruth_with_direction() -> None:
 def generate_groundtruth() -> None:
     # 生成 groundtruth 文件
     root_path = "../data/"
-    #data_name = "streamAnnRecallV13_1000w"
+    # data_name = "streamAnnRecallV13_1000w"
     data_name = "ReferAnnRecallV7_10w"
+
     # 计算 query 的 topk groundtruth
     topk = 200
     dis_type = 'ip'
-    
+
     use_pca = False
     pca_dim = 128
     sample_ratio = 0.1
 
     base_path = os.path.join(root_path, data_name, data_name + "_base.fvecs")
     query_path = os.path.join(root_path, data_name, data_name + "_query.fvecs")
-    groundtruth_path = os.path.join(root_path, data_name, data_name + f"_groundtruth.ivecs.{dis_type}")
-    
+    groundtruth_path = os.path.join(
+        root_path, data_name, data_name + f"_groundtruth.ivecs.{dis_type}")
+
     base_data = read_fvecs(base_path)
     query_data = read_fvecs(query_path)
     if use_pca:
@@ -1061,10 +1073,12 @@ def generate_groundtruth() -> None:
 
 def compare_recall() -> None:
     root_path = "/home/web_server/cc/project/ANN-Data/data/"
-    base_groundtruth_path = root_path + "dup128d_200w/dup128d_200w_groundtruth_l2.ivecs"
-    compare_groundtruth_path = root_path + "dup128d_200w/dup128d_200w_groundtruth_ip.ivecs"
-    
-    groundtruth_a = read_ivecs(base_groundtruth_path) 
+    base_groundtruth_path = root_path + \
+        "dup128d_200w/dup128d_200w_groundtruth_l2.ivecs"
+    compare_groundtruth_path = root_path + \
+        "dup128d_200w/dup128d_200w_groundtruth_ip.ivecs"
+
+    groundtruth_a = read_ivecs(base_groundtruth_path)
     groundtruth_b = read_ivecs(compare_groundtruth_path)
     dim_exp = groundtruth_a.shape[1]
 
@@ -1335,6 +1349,7 @@ def cal_inversion_degree():
             2047.0, 2041.0, 2055.0, 2053.0, 2056.0, 2056.0, 2049.0, 2067.0, 2070.0, 2076.0, 2074.0, 2064.0, 2068.0, 2074.0, 2076.0, 2071.0, 2074.0, 2067.0, 2059.0, 2079.0, 2076.0, 2080.0, 2077.0, 2078.0, 2079.0, 2084.0, 2094.0, 2082.0, 2084.0, 2093.0, 2089.0, 2088.0, 2095.0, 2088.0, 2089.0, 2096.0, 2095.0, 2112.0, 2102.0, 2104.0, 2100.0, 2107.0, 2114.0, 2110.0, 2108.0, 2118.0, 2106.0, 2118.0, 2113.0, 2121.0]
 
     size = len(data)
+
     def merge_sort(arr):
         if len(arr) <= 1:
             return arr, 0
@@ -1414,7 +1429,7 @@ def compute_pq_dis():
     codebook_path = "/mnt/test/cc/project/ANN-Data/data/statistics/codebooks/sift1m/codebooks_flash-v4_400_32_32_256.txt"
     base_data_path = "/mnt/test/cc/project/ANN-Data/data//sift1m/sift1m_base.fvecs"
     query_data_path = "/mnt/test/cc/project/ANN-Data/data//sift1m/sift1m_query.fvecs"
-    
+
     enable_pca = False
     if "_PCA_" in codebook_path:
         enable_pca = True
@@ -1432,8 +1447,10 @@ def compute_pq_dis():
 
     query_index = [0]
     # base_index = [828963, 3049115, 3357286, 9904061, 7420272, 2155121]
-    base_index = [932085, 934876, 561813, 708177, 706771, 695756, 435345, 701258, 455537, 872728, 36538, 562594, 908244, 600499, 893601, 619660, 562167, 746931, 565419, 236647, 568573, 565814, 36267, 2176, 931632, 454263, 3752, 910119, 722642, 843384, 886630, 68299, 779712, 871066, 721706, 49874, 886222, 480497, 619829, 701919, 882, 87578, 224263, 4009, 871568, 478814, 225116, 904911, 391655, 541845,
-                  565484, 2837, 102903, 159953, 171663, 957845, 791852, 368702, 453447, 915482, 930567, 544275, 180955, 59844, 882946, 899809, 882961, 988166, 860056, 221339, 556209, 544202, 394507, 486457, 529986, 732473, 104122, 923811, 564914, 36139, 710644, 806773, 465294, 237161, 871048, 569837, 374617, 463781, 956733, 919197, 678385, 158759, 240996, 931948, 16429, 91348, 63349, 398306, 931721, 989762]
+    base_index = [
+        932085, 934876, 561813, 708177, 706771, 695756, 435345, 701258, 455537, 872728, 36538, 562594, 908244, 600499, 893601, 619660, 562167, 746931, 565419, 236647, 568573, 565814, 36267, 2176, 931632, 454263, 3752, 910119, 722642, 843384, 886630, 68299, 779712, 871066, 721706, 49874, 886222, 480497, 619829, 701919, 882, 87578, 224263, 4009, 871568, 478814, 225116, 904911, 391655, 541845,
+        565484, 2837, 102903, 159953, 171663, 957845, 791852, 368702, 453447, 915482, 930567, 544275, 180955, 59844, 882946, 899809, 882961, 988166, 860056, 221339, 556209, 544202, 394507, 486457, 529986, 732473, 104122, 923811, 564914, 36139, 710644, 806773, 465294, 237161, 871048, 569837, 374617, 463781, 956733, 919197, 678385, 158759, 240996, 931948, 16429, 91348, 63349, 398306, 931721, 989762
+    ]
     # base_index = [932085]
 
     base_data = read_fvecs(base_data_path)[base_index]
@@ -1536,7 +1553,8 @@ if __name__ == "__main__":
 
         # read_pq_codebook("/home/chencheng12/project/ann_data/data/codebooks/sift/codebooks_flash_INT8_512_32_16_256_64_0_1_0.txt", 128, 16, 256)
         # compute_ip_dis()
-        #random_emb(128)
+        # random_emb(128)
+
         pass
     finally:
         from joblib.externals.loky import get_reusable_executor
