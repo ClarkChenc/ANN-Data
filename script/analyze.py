@@ -111,7 +111,7 @@ def plot_data_with_tsne():
 def plot_data_with_umap():
     root_path = "/home/web_server/cc/project/ANN-Data/data"
     data_name = "ReferAnnRecallV7_10w"
-    query_n = 10
+    query_n = 20
 
     data_path = os.path.join(root_path, data_name, data_name + "_base.fvecs")
     ground_truth_path = os.path.join(
@@ -129,7 +129,7 @@ def plot_data_with_umap():
     cmap = cm.get_cmap('tab20', n_clusters)
     colors = cmap(np.arange(n_clusters))
     point_colors = np.full((len(labels), 4), fill_value=(
-        0.6, 0.6, 0.6, 0.1))  # RGBA 灰色半透明
+        0.5, 0.5, 0.5, 0.1))  # RGBA 灰色半透明
 
     for idx, label in enumerate(cluster_labels):
         point_colors[labels == label] = colors[idx]
