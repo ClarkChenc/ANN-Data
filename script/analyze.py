@@ -117,6 +117,19 @@ def plot_data_with_umap():
     ground_truth_data = read_ivecs(ground_truth_path, True)[:query_n]
     labels = generate_labels_with_ground_truth(data, ground_truth_data)
 
+    # 映射颜色
+    unique_labels = np.unique(labels)
+    cluster_labels = unique_labels[unique_labels != -1]
+    n_clusters = len(cluster_labels)
+
+    cmap = cm.get_cmap('tab20', n_clusters)
+    colors = cmap(np.arange(n_clusters))
+    point_colors = np.full((len(labels), 4), fill_value=(
+        0.6, 0.6, 0.6, 0.5))  # RGBA 灰色半透明
+
+    for idx, label in enumerate(cluster_labels):
+        point_colors[labels == label] = colors[idx]
+
     t_start = time.time()
     reducer = umap.UMAP(n_neighbors=64, min_dist=0.1,
                         metric='cosine', random_state=42)
@@ -126,7 +139,7 @@ def plot_data_with_umap():
 
     plt.figure(figsize=(10, 10))
     scatter = plt.scatter(data_2d[:, 0], data_2d[:, 1], s=1,
-                          alpha=0.2, c=labels, cmap='Spectral')
+                          alpha=0.2, c=point_colors, cmap='Spectral')
     plt.title(f'UMAP Visualization of {data_name}')
     plt.colorbar(scatter)
     plt.grid(True)
