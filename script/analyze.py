@@ -15,7 +15,9 @@ import matplotlib.colors as mcolors
 from mpl_toolkits.mplot3d import Axes3D  # 引入3D支持
 import plotly.express as px
 import plotly.io as pio
+import plotly.graph_objects as go
 import pandas as pd
+
 
 from matplotlib.patches import Patch
 
@@ -174,17 +176,40 @@ def plot_data_with_umap():
     df["label_str"] = df["label"].astype(str)
     df.loc[df["label"] == -1, "label_str"] = "Unlabeled"
 
-    # 🎨 绘图
-    fig = px.scatter_3d(
-        df,
-        x="x", y="y", z="z",
-        color="label_str",
-        color_discrete_sequence=px.colors.qualitative.Set3 + ["#999999"],
-        title=f"UMAP 3D Visualization of {data_name}",
-        opacity=0.4
+   # 创建一个 figure
+    fig = go.Figure()
+
+    unique_labels = np.unique(labels)
+    colors = px.colors.qualitative.T10  # 颜色列表可选其他
+
+    for i, label in enumerate(unique_labels):
+        subset = df[df["label"] == label]
+        size = 1 if label == -1 else 2
+        opacity = 0.4 if label == -1 else 1.0
+
+        color = colors[i % len(colors)]
+        if label == -1:
+            color = "rgba(150,150,150,0.4)"
+
+        fig.add_trace(go.Scatter3d(
+            x=subset["x"],
+            y=subset["y"],
+            z=subset["z"],
+            mode="markers",
+            name=f"Label {label}",
+            marker=dict(
+                size=size,
+                color=color,
+                opacity=opacity
+            )
+        ))
+
+    fig.update_layout(
+        title="UMAP 3D Visualization",
+        scene=dict(xaxis_title="X", yaxis_title="Y", zaxis_title="Z"),
+        legend_title="Labels",
+        margin=dict(l=0, r=0, b=0, t=30),
     )
-    fig.update_traces(marker=dict(size=1))
-    fig.update_layout(legend_title_text='Labels')
 
     # 💾 保存为 HTML
     output_path = f"../output/{data_name}_umap_3d.html"
