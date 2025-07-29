@@ -122,7 +122,7 @@ def plot_3d_data(data_3d, extra_info, output_path):
 
         # data info
         hover_data_texts = [
-            f"index: {idx}<br>dis: {dis:.5f}<br>is_query: {is_query}" for idx, dis, is_query in zip(subset_data["index"], subset_data['dists'], subset_data['is_query'])
+            f"index: {idx}<br>label: {label}<br>dis: {dis:.5f}<br>is_query: {is_query}" for idx, dis, is_query in zip(subset_data["index"], subset_data['dists'], subset_data['is_query'])
         ]
 
         fig.add_trace(
@@ -144,7 +144,7 @@ def plot_3d_data(data_3d, extra_info, output_path):
 
         # query info
         hover_query_texts = [
-            f"index: {idx}<br>dis: {dis:.5f}<br>is_query: {is_query}" for idx, dis, is_query in zip(subset_query["index"], subset_query['dists'], subset_query['is_query'])
+            f"index: {idx}<br>label: {label}<br>dis: {dis:.5f}<br>is_query: {is_query}" for idx, dis, is_query in zip(subset_query["index"], subset_query['dists'], subset_query['is_query'])
         ]
 
         fig.add_trace(
@@ -153,7 +153,7 @@ def plot_3d_data(data_3d, extra_info, output_path):
                 y=subset_query["y"],
                 z=subset_query["z"],
                 mode="markers",
-                name=f"Label {label}",
+                name=f"Label_Query {label}",
                 text=hover_query_texts,
                 hoverinfo="text",
                 marker=dict(
