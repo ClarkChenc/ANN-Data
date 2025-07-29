@@ -85,14 +85,16 @@ def plot_xy_data(group_data, output_path):
 
 def plot_3d_data(data_3d, extra_info, output_path):
     labels = extra_info["labels"]
-    dis = extra_info["dis"]
+    dis = extra_info["dists"]
+    is_query = extra_info["is_query"]
 
     df = pd.DataFrame(data_3d, columns=["x", "y", "z"])
     df["label"] = labels
     df["label_str"] = df["label"].astype(str)
     df.loc[df["label"] == -1, "label_str"] = "Unlabeled"
     df["index"] = np.arange(len(labels))  # 可选：数据点索引
-    df["dis"] = dis
+    df["dists"] = dis
+    df['is_query'] = is_query
 
     # 创建一个 figure
     fig = go.Figure()
@@ -102,31 +104,62 @@ def plot_3d_data(data_3d, extra_info, output_path):
 
     for i, label in enumerate(unique_labels):
         subset = df[df["label"] == label]
-        size = 1 if label == -1 else 2
+        subset_data = subset[subset['is_query'] == 0]  # 仅查询点
+        subset_query = subset[subset['is_query'] == 1]
+
+        size = 2
+        # 如果是 -1 标签，设置 size 为 1
+        if label == -1:
+            size = 1
+
+        # 透明度
         opacity = 0.4 if label == -1 else 1.0
 
+        # 颜色
         color = colors[i % len(colors)]
         if label == -1:
             color = "rgba(150,150,150,0.4)"
 
-        # 设置 hover 信息
-        hover_texts = [
-            f"index: {idx}<br>dis: {dis:.5f}" for idx, dis in zip(subset["index"], subset['dis'])
+        # data info
+        hover_data_texts = [
+            f"index: {idx}<br>dis: {dis:.5f}<br>is_query: {is_query}" for idx, dis, is_query in zip(subset_data["index"], subset_data['dists'], subset_data['is_query'])
         ]
 
         fig.add_trace(
             go.Scatter3d(
-                x=subset["x"],
-                y=subset["y"],
-                z=subset["z"],
+                x=subset_data["x"],
+                y=subset_data["y"],
+                z=subset_data["z"],
                 mode="markers",
                 name=f"Label {label}",
-                text=hover_texts,
+                text=hover_data_texts,
                 hoverinfo="text",
                 marker=dict(
                     size=size,
                     color=color,
                     opacity=opacity
+                )
+            )
+        )
+
+        # query info
+        hover_query_texts = [
+            f"index: {idx}<br>dis: {dis:.5f}<br>is_query: {is_query}" for idx, dis, is_query in zip(subset_query["index"], subset_query['dists'], subset_query['is_query'])
+        ]
+
+        fig.add_trace(
+            go.Scatter3d(
+                x=subset_query["x"],
+                y=subset_query["y"],
+                z=subset_query["z"],
+                mode="markers",
+                name=f"Label {label}",
+                text=hover_query_texts,
+                hoverinfo="text",
+                marker=dict(
+                    size=size + 2,
+                    color="black",
+                    opacity=1
                 )
             )
         )

@@ -13,18 +13,29 @@ import time
 
 
 def generate_labels_with_ground_truth(data, query_data, ground_truth_data):
-    n_base = data.shape[0]
+    n_data = data.shape[0]
     n_query = ground_truth_data.shape[0]
 
-    labels = -1 * np.ones(n_base, dtype=np.int32)
-    dis = -1 * np.ones(n_base, dtype=np.float32)
+    labels = -1 * np.ones(n_data, dtype=np.int32)
+    dists = -1 * np.ones(n_data, dtype=np.float32)
+    is_query = 0 * np.ones(n_data, dtype=np.int32)
+
+    # 处理 base_data
     for qid in range(n_query):
         for idx in ground_truth_data[qid]:
             if labels[idx] == -1:
                 labels[idx] = qid
-                dis[idx] = 1-np.dot(data[idx], query_data[qid])  # 计算余弦距离
+                dists[idx] = 1-np.dot(data[idx], query_data[qid])  # 计算余弦距离
 
-    return labels, dis
+    # 处理 query_data
+    last_n_indices = np.arange(len(data))[-n_query:]
+    for qid in range(n_query):
+        idx = last_n_indices[qid]
+        labels[idx] = qid
+        dists[idx] = 0.0
+        is_query[idx] = 1
+
+    return labels, dists, is_query
 
 
 def print_hnsw_outdegree_distribute():
@@ -116,11 +127,14 @@ def plot_data_with_umap():
     ground_truth_path = os.path.join(
         root_path, data_name, data_name + "_groundtruth.ivecs")
 
-    index_path = os.path.join("../output", data_name + "_umap_3d.npy")
+    index_path = os.path.join(root_path, data_name, data_name + "_umap_3d.npy")
     plot_path = os.path.join(
         "../output", data_name + "_umap.html")
 
-    data = read_fvecs(data_path, True)
+    base_data = read_fvecs(data_path, True)
+    query_data = read_fvecs(query_path, True)[:query_n]
+
+    data = np.concatenate((base_data, query_data), axis=0)
     data_3d = None
 
     if os.path.exists(index_path):
@@ -135,14 +149,14 @@ def plot_data_with_umap():
         print(f"cost: {t_end - t_start:.2f} s")
         write_umap_data(data_3d, index_path)
 
-    query_data = read_fvecs(query_path, True)[:query_n]
     ground_truth_data = read_ivecs(ground_truth_path, True)[:query_n]
-    labels, dis = generate_labels_with_ground_truth(
+    labels, dists, is_query = generate_labels_with_ground_truth(
         data, query_data, ground_truth_data)
 
     extra_info = {}
     extra_info['labels'] = labels
-    extra_info['dis'] = dis
+    extra_info['dists'] = dists
+    extra_info['is_query'] = is_query
 
     plot_3d_data(data_3d, extra_info, plot_path)
 
