@@ -813,17 +813,18 @@ def compute_distance():
     # 计算距离
     root_path = "../data/"
     # data_name = "streamAnnRecallV13_1000w"
-    data_name = "sift1m"
+    data_name = "ReferAnnRecallV7_10w"
+    # ip / l2
+    dis_type = "ip" 
 
     # query_index = [3933039, 1792875, 3357286]
-
     # query_index = [221339]
-    query_index = [33]
-    base_index = [5452]
+    query_index = [0]
+    base_index = [70571]
 
     base_path = os.path.join(root_path, data_name, data_name + "_base.fvecs")
-    # query_path = os.path.join(root_path, data_name, data_name + "_query.fvecs")
-    query_path = os.path.join(root_path, data_name, data_name + "_base.fvecs")
+    query_path = os.path.join(root_path, data_name, data_name + "_query.fvecs")
+    #query_path = os.path.join(root_path, data_name, data_name + "_base.fvecs")
 
     base_data = read_fvecs(base_path)
     query_data = read_fvecs(query_path)
@@ -831,21 +832,19 @@ def compute_distance():
     query = query_data[query_index]
     base = base_data[base_index]
 
-    sub_vec_num = 2
-    sub_vec_dim = query.shape[1] // sub_vec_num
-    for i in range(sub_vec_num):
-        sub_query = query[:, i * sub_vec_dim: (i + 1) * sub_vec_dim]
-        sub_base = base[:, i * sub_vec_dim: (i + 1) * sub_vec_dim]
-
-        l2_dis = np.sum(sub_query ** 2, axis=1, keepdims=True) + \
-            np.sum(sub_base ** 2, axis=1) - 2 * np.dot(sub_query, sub_base.T)
-        print(f"{i} : {l2_dis}", end="\t")
-
     # 计算距离
+    dists = []
+    if dis_type == "l2":
+        dists = (
+            np.sum(query ** 2, axis=1, keepdims=True) +
+            np.sum(base ** 2, axis=1) -
+            2 * np.dot(query, base.T)
+        )  # shape: (Bq, Bb)
+    elif dis_type == "ip":
+        dists = 1-np.dot(query, base.T)
 
-    l2_squared = np.sum(query ** 2, axis=1, keepdims=True) + \
-        np.sum(base ** 2, axis=1) - 2 * np.dot(query, base.T)
-    print("total l2_score: ", l2_squared)
+
+    print(f"total dis: type: {dis_type}\ndis:{dists}")
 
 
 def compute_batch_id(id, base, query, topk, base_sqr=None):
@@ -1528,15 +1527,15 @@ if __name__ == "__main__":
         #generate_groundtruth()
         # generate_groundtruth_with_direction()
 
-        read_fvecs("/home/web_server/cc/project/ANN-Data/data/ReferAnnRecallV7_10w/ReferAnnRecallV7_10w_query.fvecs", True)
+        #read_fvecs("/home/web_server/cc/project/ANN-Data/data/ReferAnnRecallV7_10w/ReferAnnRecallV7_10w_query.fvecs", True)
 
-        #read_vecs_at("/home/web_server/cc/project/ANN-Data/data/ReferAnnRecallV7_10w/ReferAnnRecallV7_10w_groundtruth.ivecs", 0)
-        #read_vecs_at("/home/web_server/cc/project/ANN-Data/data/ReferAnnRecallV7_10w/ReferAnnRecallV7_10w_query.fvecs.all", 1)
-        #read_fvecs_at_and_save("/home/web_server/cc/project/ANN-Data/data/ReferAnnRecallV7_10w/ReferAnnRecallV7_10w_query.fvecs", 9)
+        #read_vecs_at("/home/web_server/cc/project/ANN-Data/data/ReferAnnRecallV7_10w/ReferAnnRecallV7_10w_groundtruth.ivecs", 10)
+        #read_vecs_at("/home/web_server/cc/project/ANN-Data/data/ReferAnnRecallV7_10w/ReferAnnRecallV7_10w_query.fvecs.all", 10)
+        #read_fvecs_at_and_save("/home/web_server/cc/project/ANN-Data/data/ReferAnnRecallV7_10w/ReferAnnRecallV7_10w_query.fvecs", 19)
 
         # analyze_query_2_data_dis()
 
-        # compute_distance()
+        compute_distance()
         # analyze_pq_space()
         # compute_pq_dis()
         # cal_inversion_degree()

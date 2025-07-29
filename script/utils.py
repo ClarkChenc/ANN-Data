@@ -111,7 +111,7 @@ def plot_3d_data(data_3d, extra_info, output_path):
 
         # 设置 hover 信息
         hover_texts = [
-            f"index: {idx}<br>dis: {dis:.4f}" for idx, dis in zip(subset["index"], subset['dis'])
+            f"index: {idx}<br>dis: {dis:.5f}" for idx, dis in zip(subset["index"], subset['dis'])
         ]
 
         fig.add_trace(
