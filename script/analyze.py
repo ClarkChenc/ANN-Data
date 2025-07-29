@@ -142,7 +142,7 @@ def plot_data_with_umap():
 
     else:
         t_start = time.time()
-        reducer = umap.UMAP(n_components=3, n_neighbors=200, min_dist=0.1,
+        reducer = umap.UMAP(n_components=3, n_neighbors=300, min_dist=0.01,
                             metric='cosine', random_state=42, n_jobs=10)
         data_3d = reducer.fit_transform(data)
         t_end = time.time()
