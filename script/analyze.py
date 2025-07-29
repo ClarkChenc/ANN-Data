@@ -10,29 +10,21 @@ import struct
 from sklearn.manifold import TSNE
 import umap.umap_ as umap
 import time
-import matplotlib.cm as cm
-import matplotlib.colors as mcolors
-from mpl_toolkits.mplot3d import Axes3D  # 引入3D支持
-import plotly.express as px
-import plotly.io as pio
-import plotly.graph_objects as go
-import pandas as pd
 
 
-from matplotlib.patches import Patch
-
-
-def generate_labels_with_ground_truth(data, ground_truth_data):
+def generate_labels_with_ground_truth(data, query_data, ground_truth_data):
     n_base = data.shape[0]
     n_query = ground_truth_data.shape[0]
 
     labels = -1 * np.ones(n_base, dtype=np.int32)
+    dis = -1 * np.ones(n_base, dtype=np.float32)
     for qid in range(n_query):
         for idx in ground_truth_data[qid]:
             if labels[idx] == -1:
                 labels[idx] = qid
+                dis[idx] = 1-np.dot(data[idx], query_data[qid])  # 计算余弦距离
 
-    return labels
+    return labels, dis
 
 
 def print_hnsw_outdegree_distribute():
@@ -115,108 +107,44 @@ def plot_data_with_tsne():
 
 
 def plot_data_with_umap():
-    root_path = "/home/web_server/cc/project/ANN-Data/data"
+    root_path = "../data"
     data_name = "ReferAnnRecallV7_10w"
     query_n = 20
 
     data_path = os.path.join(root_path, data_name, data_name + "_base.fvecs")
+    query_path = os.path.join(root_path, data_name, data_name + "_query.fvecs")
     ground_truth_path = os.path.join(
         root_path, data_name, data_name + "_groundtruth.ivecs")
 
+    index_path = os.path.join("../output", data_name + "_umap_3d.npy")
+    plot_path = os.path.join(
+        "../output", data_name + "_umap.html")
+
     data = read_fvecs(data_path, True)
+    data_3d = None
+
+    if os.path.exists(index_path):
+        data_3d = read_umap_data(index_path)
+
+    else:
+        t_start = time.time()
+        reducer = umap.UMAP(n_components=3, n_neighbors=200, min_dist=0.1,
+                            metric='cosine', random_state=42, n_jobs=10)
+        data_3d = reducer.fit_transform(data)
+        t_end = time.time()
+        print(f"cost: {t_end - t_start:.2f} s")
+        write_umap_data(data_3d, index_path)
+
+    query_data = read_fvecs(query_path, True)[:query_n]
     ground_truth_data = read_ivecs(ground_truth_path, True)[:query_n]
-    labels = generate_labels_with_ground_truth(data, ground_truth_data)
+    labels, dis = generate_labels_with_ground_truth(
+        data, query_data, ground_truth_data)
 
-    t_start = time.time()
-    reducer = umap.UMAP(n_components=3, n_neighbors=200, min_dist=0.1,
-                        metric='cosine', random_state=42, n_jobs=10)
-    data_3d = reducer.fit_transform(data)
-    t_end = time.time()
-    print(f"cost: {t_end - t_start:.2f} s")
+    extra_info = {}
+    extra_info['labels'] = labels
+    extra_info['dis'] = dis
 
-    # # 映射颜色
-    # unique_labels = np.unique(labels)
-    # cluster_labels = unique_labels[unique_labels != -1]
-    # n_clusters = len(cluster_labels)
-
-    # cmap = cm.get_cmap('tab20', n_clusters)
-    # colors = cmap(np.arange(n_clusters))
-    # point_colors = np.full((len(labels), 4), fill_value=(
-    #     0.5, 0.5, 0.5, 0.1))  # RGBA 灰色半透明
-
-    # for idx, label in enumerate(cluster_labels):
-    #     point_colors[labels == label] = colors[idx]
-
-    # fig = plt.figure(figsize=(10, 10))
-    # ax = fig.add_subplot(111, projection='3d')
-
-    # scatter = ax.scatter(data_3d[:, 0], data_3d[:, 1], data_3d[:, 2], s=1,
-    #                      c=point_colors)
-    # plt.title(f'UMAP Visualization of {data_name}')
-    # plt.grid(True)
-
-    # # 显示图例
-    # legend_elements = [
-    #     Patch(facecolor=(0.6, 0.6, 0.6, 0.4), edgecolor='none', label='-1 (Unlabeled)')]
-
-    # for idx, label in enumerate(cluster_labels):
-    #     color = colors[idx]
-    #     legend_elements.append(
-    #         Patch(facecolor=color, edgecolor='none', label=f'Label {label}'))
-
-    # plt.legend(handles=legend_elements, title='Labels',
-    #            bbox_to_anchor=(1.05, 1), loc='upper left')
-
-    # plt.tight_layout()
-    # plt.savefig(f'../output/{data_name}_umap.png', dpi=300)
-
-    # 🧾 构造 DataFrame
-    df = pd.DataFrame(data_3d, columns=["x", "y", "z"])
-    df["label"] = labels
-    df["label_str"] = df["label"].astype(str)
-    df.loc[df["label"] == -1, "label_str"] = "Unlabeled"
-
-   # 创建一个 figure
-    fig = go.Figure()
-
-    unique_labels = np.unique(labels)
-    colors = px.colors.qualitative.T10  # 颜色列表可选其他
-
-    for i, label in enumerate(unique_labels):
-        subset = df[df["label"] == label]
-        size = 1 if label == -1 else 2
-        opacity = 0.4 if label == -1 else 1.0
-
-        color = colors[i % len(colors)]
-        if label == -1:
-            color = "rgba(150,150,150,0.4)"
-
-        fig.add_trace(go.Scatter3d(
-            x=subset["x"],
-            y=subset["y"],
-            z=subset["z"],
-            mode="markers",
-            name=f"Label {label}",
-            marker=dict(
-                size=size,
-                color=color,
-                opacity=opacity
-            )
-        ))
-
-    fig.update_layout(
-        title="UMAP 3D Visualization",
-        scene=dict(xaxis_title="X", yaxis_title="Y", zaxis_title="Z"),
-        legend_title="Labels",
-        margin=dict(l=0, r=0, b=0, t=30),
-    )
-
-    # 💾 保存为 HTML
-    output_path = f"../output/{data_name}_umap_3d.html"
-    fig.write_html(output_path)
-    print(f"Saved interactive 3D plot to: {output_path}")
-
-    fig.write_html(f'../output/{data_name}_umap.html')
+    plot_3d_data(data_3d, extra_info, plot_path)
 
     return
 
