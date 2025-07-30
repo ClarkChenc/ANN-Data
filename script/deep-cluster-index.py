@@ -73,6 +73,8 @@ class DeepClusterIndex:
         code = ""
         for i in range(self.data.shape[0]):
             item = self.data[i].copy()
+            if i % 100000:
+                print(f"build item {i}/{self.data.shape[0]}....")
             for level in range(self.n_level):
                 codebook = self.codebooks[level]
                 # 从 codebook中找到最近的中心，使用 ip 距离
