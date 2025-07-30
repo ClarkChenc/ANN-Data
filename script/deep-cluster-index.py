@@ -70,8 +70,8 @@ class DeepClusterIndex:
     def build_index(self):
         self.index = {}
 
-        code = ""
         for i in range(self.data.shape[0]):
+            code = ""
             item = self.data[i].copy()
             if i % 100000 == 0:
                 print(f"build item {i}/{self.data.shape[0]}....")
