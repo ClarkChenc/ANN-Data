@@ -8,6 +8,21 @@ import plotly.graph_objects as go
 import pandas as pd
 
 
+def random_emb(dim: int):
+    np.random.seed(42)
+    n_data = 1
+    data = np.random.rand(n_data, dim).astype(np.float32)
+    print(f"random_emb: {data.shape}")
+
+    data = data[0]
+    emb_str = ""
+    for i in range(dim):
+        emb_str += f"{data[i]:.6f}, "
+
+    print(f"random_emb: \n{emb_str}")
+    return
+
+
 def read_fvecs(file_name: str, show_shape: bool = False) -> np.ndarray:
     print("begin to read fvecs: ", file_name)
     with open(file_name, 'rb') as f:

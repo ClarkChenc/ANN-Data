@@ -815,7 +815,7 @@ def compute_distance():
     # data_name = "streamAnnRecallV13_1000w"
     data_name = "ReferAnnRecallV7_10w"
     # ip / l2
-    dis_type = "ip" 
+    dis_type = "ip"
 
     # query_index = [3933039, 1792875, 3357286]
     # query_index = [221339]
@@ -824,7 +824,7 @@ def compute_distance():
 
     base_path = os.path.join(root_path, data_name, data_name + "_base.fvecs")
     query_path = os.path.join(root_path, data_name, data_name + "_query.fvecs")
-    #query_path = os.path.join(root_path, data_name, data_name + "_base.fvecs")
+    # query_path = os.path.join(root_path, data_name, data_name + "_base.fvecs")
 
     base_data = read_fvecs(base_path)
     query_data = read_fvecs(query_path)
@@ -842,7 +842,6 @@ def compute_distance():
         )  # shape: (Bq, Bb)
     elif dis_type == "ip":
         dists = 1-np.dot(query, base.T)
-
 
     print(f"total dis: type: {dis_type}\ndis:{dists}")
 
@@ -1107,19 +1106,6 @@ def compare_recall() -> None:
     print(f"recall score: {recall_score}")
 
 
-def compute_kmeans(file_path: str, n_subvector: int, n_class: int) -> None:
-    # 计算 PQ
-    data = read_fvecs(file_path)
-    n_data, dim = data.shape
-
-    sub_dim = dim // n_subvector
-    print(f"n_data: {n_data}, dim: {dim}, sub_dim: {sub_dim}")
-
-    # 计算 kmeans
-
-    print("pq done")
-
-
 def read_pq_codebook(file_path: str, dim: int, n_subvector: int, n_class: int, enable_pca: bool = False, pca_principal_dim: int = 0) -> None:
     print(f"load codebook from {file_path}")
     q_min = 0.0
@@ -1196,8 +1182,8 @@ def encode_pq(data: np.ndarray, codebook: np.ndarray, pre_lengths: np.ndarray, q
         data_min = np.inf
         data_max = 0
         for i in range(n_subvector):
-            subvector = data[k][pre_lengths[i]                                : pre_lengths[i] + subvector_len[i]]
-            subvector_codebook = codebook[:, pre_lengths[i]                                          : pre_lengths[i] + subvector_len[i]]
+            subvector = data[k][pre_lengths[i]: pre_lengths[i] + subvector_len[i]]
+            subvector_codebook = codebook[:, pre_lengths[i]: pre_lengths[i] + subvector_len[i]]
             max_dis = 0
 
             best_class = 0
@@ -1301,26 +1287,6 @@ def get_subvector_dis(query, data, subvec_size):
                 ret[i][j][k] = l2_dis
 
     return ret
-
-
-def get_data_by_flash_encode():
-    src_path = "/home/web_server/cc/project/ANN-Data/data/streamAnnRecallV13_1000w/streamAnnRecallV13_1000w.flash.ivecs"
-    target_encode = [113, 253, 162, 73, 30, 10, 44, 57, 144, 2, 217, 175, 105, 56,
-                     65, 50, 179, 234, 243, 62, 240, 228, 81, 183, 5, 204, 158, 0, 248, 114, 51, 213]
-
-    cand = []
-    datas = read_ivecs(src_path)
-
-    for i in range(len(datas)):
-        if i % 2000000:
-            print(f"process {i} ....")
-        data = datas[i]
-        if np.array_equal(data, target_encode):
-            cand.append(i)
-
-    print(f"cand: {cand}")
-
-    return
 
 
 def cal_inversion_degree():
@@ -1499,21 +1465,6 @@ def compute_ip_dis():
     pass
 
 
-def random_emb(dim: int):
-    np.random.seed(42)
-    n_data = 1
-    data = np.random.rand(n_data, dim).astype(np.float32)
-    print(f"random_emb: {data.shape}")
-
-    data = data[0]
-    emb_str = ""
-    for i in range(dim):
-        emb_str += f"{data[i]:.6f}, "
-
-    print(f"random_emb: \n{emb_str}")
-    pass
-
-
 if __name__ == "__main__":
     try:
         # huggingface_dataset_download()
@@ -1524,14 +1475,14 @@ if __name__ == "__main__":
         # transfer_hnsw_to_fvecs()
 
         # split_dataset()
-        #generate_groundtruth()
+        # generate_groundtruth()
         # generate_groundtruth_with_direction()
 
-        #read_fvecs("/home/web_server/cc/project/ANN-Data/data/ReferAnnRecallV7_10w/ReferAnnRecallV7_10w_query.fvecs", True)
+        # read_fvecs("/home/web_server/cc/project/ANN-Data/data/ReferAnnRecallV7_10w/ReferAnnRecallV7_10w_query.fvecs", True)
 
-        #read_vecs_at("/home/web_server/cc/project/ANN-Data/data/ReferAnnRecallV7_10w/ReferAnnRecallV7_10w_groundtruth.ivecs", 10)
-        #read_vecs_at("/home/web_server/cc/project/ANN-Data/data/ReferAnnRecallV7_10w/ReferAnnRecallV7_10w_query.fvecs.all", 10)
-        #read_fvecs_at_and_save("/home/web_server/cc/project/ANN-Data/data/ReferAnnRecallV7_10w/ReferAnnRecallV7_10w_query.fvecs", 19)
+        # read_vecs_at("/home/web_server/cc/project/ANN-Data/data/ReferAnnRecallV7_10w/ReferAnnRecallV7_10w_groundtruth.ivecs", 10)
+        # read_vecs_at("/home/web_server/cc/project/ANN-Data/data/ReferAnnRecallV7_10w/ReferAnnRecallV7_10w_query.fvecs.all", 10)
+        # read_fvecs_at_and_save("/home/web_server/cc/project/ANN-Data/data/ReferAnnRecallV7_10w/ReferAnnRecallV7_10w_query.fvecs", 19)
 
         # analyze_query_2_data_dis()
 
@@ -1546,7 +1497,6 @@ if __name__ == "__main__":
 
         # pca_dim_analyze("/mnt/test/cc/project/ANN-Data/data//sift1m_base.fvecs", 200000, 0.90)
         # compare_recall()
-        # get_data_by_flash_encode()
 
         # read_pq_codebook("/home/chencheng12/project/ann_data/data/codebooks/sift/codebooks_flash_INT8_512_32_16_256_64_0_1_0.txt", 128, 16, 256)
         # compute_ip_dis()
