@@ -80,6 +80,7 @@ class DeepClusterIndex:
                 # 从 codebook中找到最近的中心，使用 ip 距离
                 dis = np.dot(codebook, item)
                 idx = np.argmax(dis)
+                item = item - codebook[idx]  # 更新残差
                 code += str(idx) + "_"
             code = code[:-1]  # 去掉最后一个下划线
             if code not in self.index:
@@ -89,10 +90,13 @@ class DeepClusterIndex:
 
     def search(self, query_data):
         query_code = ""
+
+        item = query_data.copy()
         for level in range(self.n_level):
             codebook = self.codebooks[level]
-            dis = np.dot(codebook, query_data)
+            dis = np.dot(codebook, item)
             idx = np.argmax(dis)
+            item = item - codebook[idx]  # 更新残差
             query_code += str(idx) + "_"
         query_code = query_code[:-1]  # 去掉最后一个下划线
         if query_code in self.index:
