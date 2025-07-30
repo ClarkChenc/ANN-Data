@@ -52,7 +52,7 @@ class DeepClusterIndex:
             self.index = np.load(index_data_path, allow_pickle=True)
         else:
             print(f"Building index at {index_data_path}...")
-            pathlib.Path(index_data_path).mkdir(parents=True, exist_ok=True)
+            pathlib.Path(index_path).mkdir(parents=True, exist_ok=True)
             self.build_index()
             np.save(index_data_path, self.index)
 
