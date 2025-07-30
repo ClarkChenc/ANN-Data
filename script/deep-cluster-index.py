@@ -2,7 +2,8 @@ import numpy as np
 from sklearn.cluster import KMeans, MiniBatchKMeans
 import os
 import pathlib
-import utils
+
+from utils import *
 
 
 def kmeans(data, n_cluster, max_iter=300, random_state=42):
@@ -120,14 +121,14 @@ def compute_recall(index, query_data, ground_truth):
 
 def run():
     root_path = "../data/"
-    data_name = ""
+    data_name = "sift1m"
     n_layer = 3
     n_cluster = 500
 
     data_path = os.path.join(root_path, data_name, data_name + "_base.fvecs")
     query_path = os.path.join(root_path, data_name, data_name + "_query.fvecs")
     ground_truth_path = os.path.join(
-        root_path, data_name, data_name + "_query.ivecs")
+        root_path, data_name, data_name + "_groundtruth.ivecs")
     index_path = os.path.join(root_path, "codebooks",
                               data_name, f"dc_index_{n_layer}_{n_cluster}")
 
@@ -136,7 +137,7 @@ def run():
     ground_truth = read_ivecs(ground_truth_path)
 
     print(f"begin to build index...{index_path}")
-    index = DeepClusterIndex(data, n_cluster, n_layer, index_path)
+    index = DeepClusterIndex(base_data, n_cluster, n_layer, index_path)
 
     print(f"begin search...{query_path}")
     recall_score = compute_recall(index, query_data, ground_truth)

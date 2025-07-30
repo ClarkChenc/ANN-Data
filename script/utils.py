@@ -23,7 +23,7 @@ def random_emb(dim: int):
     return
 
 
-def read_fvecs(file_name: str, show_shape: bool = False) -> np.ndarray:
+def read_fvecs(file_name: str, show_shape: bool = True) -> np.ndarray:
     print("begin to read fvecs: ", file_name)
     with open(file_name, 'rb') as f:
         data = np.fromfile(f, dtype=np.float32)
@@ -38,7 +38,7 @@ def read_fvecs(file_name: str, show_shape: bool = False) -> np.ndarray:
     return data[:, 1:]
 
 
-def read_ivecs(file_name: str, show_shape: bool = False) -> np.ndarray:
+def read_ivecs(file_name: str, show_shape: bool = True) -> np.ndarray:
     print("begin to read ivecs: ", file_name)
     with open(file_name, 'rb') as f:
         data = np.fromfile(f, dtype=np.int32)
