@@ -117,7 +117,7 @@ def compute_recall(index, query_data, ground_truth):
             continue
         # 计算召回率
         gt = ground_truth[i]
-        if gt in ret_data:
+        if np.isin(gt, ret_data).any():
             recall_count += 1
     recall_score = recall_count / query_count if query_count > 0 else 0.0
 
