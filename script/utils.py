@@ -115,7 +115,7 @@ def plot_3d_data(data_3d, extra_info, output_path):
     fig = go.Figure()
 
     unique_labels = np.unique(labels)
-    colors = px.colors.qualitative.T10  # 颜色列表可选其他
+    colors = px.colors.qualitative.Alphabet  # 颜色列表可选其他
 
     for i, label in enumerate(unique_labels):
         subset = df[df["label"] == label]

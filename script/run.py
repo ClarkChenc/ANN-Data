@@ -819,8 +819,8 @@ def compute_distance():
 
     # query_index = [3933039, 1792875, 3357286]
     # query_index = [221339]
-    query_index = [0]
-    base_index = [70571]
+    query_index = [11]
+    base_index = [13346]
 
     base_path = os.path.join(root_path, data_name, data_name + "_base.fvecs")
     query_path = os.path.join(root_path, data_name, data_name + "_query.fvecs")
@@ -1480,9 +1480,9 @@ if __name__ == "__main__":
 
         # read_fvecs("/home/web_server/cc/project/ANN-Data/data/ReferAnnRecallV7_10w/ReferAnnRecallV7_10w_query.fvecs", True)
 
-        # read_vecs_at("/home/web_server/cc/project/ANN-Data/data/ReferAnnRecallV7_10w/ReferAnnRecallV7_10w_groundtruth.ivecs", 10)
-        # read_vecs_at("/home/web_server/cc/project/ANN-Data/data/ReferAnnRecallV7_10w/ReferAnnRecallV7_10w_query.fvecs.all", 10)
-        # read_fvecs_at_and_save("/home/web_server/cc/project/ANN-Data/data/ReferAnnRecallV7_10w/ReferAnnRecallV7_10w_query.fvecs", 19)
+        #read_vecs_at("/home/web_server/cc/project/ANN-Data/data/ReferAnnRecallV7_10w/ReferAnnRecallV7_10w_groundtruth.ivecs", 10)
+        #read_vecs_at("/home/web_server/cc/project/ANN-Data/data/ReferAnnRecallV7_10w/ReferAnnRecallV7_10w_groundtruth.ivecs", 11)
+        #read_fvecs_at_and_save("/home/web_server/cc/project/ANN-Data/data/ReferAnnRecallV7_10w/ReferAnnRecallV7_10w_query.fvecs", 19)
 
         # analyze_query_2_data_dis()
 
