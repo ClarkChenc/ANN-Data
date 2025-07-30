@@ -61,7 +61,7 @@ class DeepClusterIndex:
         residual = self.data.copy()
 
         for i in range(self.n_level):
-            print(f"Training level {i + 1} codebook...")
+            print(f"Training level {i + 1} / {self.n_level} codebook...")
             centers, labels = kmeans(residual, self.n_cluster)  # 全局
             self.codebooks.append(centers)
             residual = residual - centers[labels]               # 更新残差
@@ -121,7 +121,7 @@ def compute_recall(index, query_data, ground_truth):
 
 def run():
     root_path = "../data/"
-    data_name = "sift1m"
+    data_name = "ReferAnnRecallV7_100w"
     n_layer = 3
     n_cluster = 500
 
@@ -137,7 +137,7 @@ def run():
     ground_truth = read_ivecs(ground_truth_path)
 
     print(f"begin to build index...{index_path}")
-    index = DeepClusterIndex(base_data, n_cluster, n_layer, index_path)
+    index = DeepClusterIndex(base_data, n_layer, n_cluster, index_path)
 
     print(f"begin search...{query_path}")
     recall_score = compute_recall(index, query_data, ground_truth)
