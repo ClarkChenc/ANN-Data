@@ -68,7 +68,6 @@ class DeepClusterIndex:
         return
 
     def build_index(self):
-        print(f"Building index at {index_path}...")
         self.index = {}
 
         code = ""
