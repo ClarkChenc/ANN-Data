@@ -49,12 +49,13 @@ class DeepClusterIndex:
         index_data_path = os.path.join(index_path, 'index.npy')
         if os.path.exists(index_data_path):
             print(f"Index already exists at {index_data_path}. Loading...")
-            self.index = np.load(index_data_path, allow_pickle=True)
+            self.index = np.load(index_data_path, allow_pickle=True).item()
+
         else:
             print(f"Building index at {index_data_path}...")
             pathlib.Path(index_path).mkdir(parents=True, exist_ok=True)
             self.build_index()
-            np.save(index_data_path, self.index)
+            np.save(index_data_path, self.index, allow_pickle = True)
 
     def train_codebooks(self):
         self.codebooks = []
@@ -113,10 +114,9 @@ def compute_recall(index, query_data, ground_truth):
     for i in range(query_count):
         ret_data = index.search(query_data[i])
         if len(ret_data) == 0:
-            print("No results found.")
             continue
         # 计算召回率
-        gt = ground_truth[i]
+        gt = ground_truth[i][:10]
         if np.isin(gt, ret_data).any():
             recall_count += 1
     recall_score = recall_count / query_count if query_count > 0 else 0.0
@@ -126,7 +126,7 @@ def compute_recall(index, query_data, ground_truth):
 
 def run():
     root_path = "../data/"
-    data_name = "ReferAnnRecallV7_100w"
+    data_name = "ReferAnnRecallV7_1000w"
     n_layer = 3
     n_cluster = 500
 
