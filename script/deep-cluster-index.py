@@ -73,7 +73,7 @@ class DeepClusterIndex:
         code = ""
         for i in range(self.data.shape[0]):
             item = self.data[i].copy()
-            if i % 100000:
+            if i % 100000 == 0:
                 print(f"build item {i}/{self.data.shape[0]}....")
             for level in range(self.n_level):
                 codebook = self.codebooks[level]
